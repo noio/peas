@@ -32,38 +32,47 @@ class NEATGenotype(object):
                  outputs=1, 
                  types=['tanh'],
                  feedforward=False,
+                 response_default=4.924273,
                  prob_add_node=0.03,
                  prob_add_conn=0.05,
                  prob_mutate_weight=0.9,
                  prob_reenable_conn=0.01,
                  prob_mutate_bias=0.2,
+                 prob_mutate_response=0.2,
                  prob_mutate_type=0.2,
                  stdev_mutate_weight=2.0,
                  stdev_mutate_bias=0.5,
+                 stdev_mutate_response=0.5,
                  weight_range=(-30., 30.),
                  distance_excess=1.0,
                  distance_disjoint=1.0,
                  distance_weight=0.4):
         
         # Settings
-        self.inputs              = inputs
-        self.outputs             = outputs
-        self.types               = types
-        self.feedforward         = feedforward
-        self.prob_add_conn       = prob_add_conn
-        self.prob_add_node       = prob_add_node
-        self.prob_mutate_weight  = prob_mutate_weight
-        self.prob_reenable_conn  = prob_reenable_conn
-        self.prob_mutate_bias    = prob_mutate_bias
-        self.prob_mutate_type    = prob_mutate_type
-        self.stdev_mutate_weight = stdev_mutate_weight
-        self.stdev_mutate_bias   = stdev_mutate_bias
-        self.weight_range        = weight_range
-        self.distance_excess     = distance_excess
-        self.distance_disjoint   = distance_disjoint
-        self.distance_weight     = distance_weight
+        self.inputs           = inputs
+        self.outputs          = outputs
+        self.types            = types
+        self.feedforward      = feedforward
+        self.response_default = response_default
         
-        self.node_genes = [] #: Tuples of (fforder, type, bias)
+        self.prob_add_conn        = prob_add_conn
+        self.prob_add_node        = prob_add_node
+        self.prob_mutate_weight   = prob_mutate_weight
+        self.prob_reenable_conn   = prob_reenable_conn
+        self.prob_mutate_bias     = prob_mutate_bias
+        self.prob_mutate_response = prob_mutate_response
+        self.prob_mutate_type     = prob_mutate_type
+        
+        self.stdev_mutate_weight   = stdev_mutate_weight
+        self.stdev_mutate_bias     = stdev_mutate_bias
+        self.stdev_mutate_response = stdev_mutate_response
+        self.weight_range          = weight_range
+        
+        self.distance_excess   = distance_excess
+        self.distance_disjoint = distance_disjoint
+        self.distance_weight   = distance_weight
+        
+        self.node_genes = [] #: Tuples of (fforder, type, bias, response)
         self.conn_genes = {} #: Tuples of (innov, from, to, weight, enabled)
         
         # The default method of creating a genotype
@@ -72,7 +81,9 @@ class NEATGenotype(object):
         # to the output node.
         
         for i in xrange(self.inputs + self.outputs):
-            self.node_genes.append( [i * 1024.0, random.choice(self.types), 0.0] )
+            # We set the 'response' to 4.924273. Stanley doesn't mention having the response
+            # be subject to evolution, so this is #weird, but we'll do it because neat-python does.
+            self.node_genes.append( [i * 1024.0, random.choice(self.types), 0.0, self.response_default] )
             
         innov = 0
         for i in xrange(self.inputs):
@@ -96,7 +107,7 @@ class NEATGenotype(object):
             # We assign a random function type to the node, which is #weird
             # because I thought that in NEAT these kind of mutations
             # initially don't affect the functionality of the network.
-            node_gene = [avg_fforder, random.choice(self.types), 0.0]
+            node_gene = [avg_fforder, random.choice(self.types), 0.0, self.response_default]
             new_id = len(self.node_genes)
             self.node_genes.append(node_gene)
 
@@ -152,6 +163,9 @@ class NEATGenotype(object):
                     
                 if rand() < self.prob_mutate_type:
                     node_gene[1] = random.choice(self.types)
+                    
+                if rand() < self.prob_mutate_response:
+                    node_gene[3] += np.random.normal(0, self.stdev_mutate_response)
                     
         return self # For chaining
         
@@ -243,15 +257,20 @@ class NEATGenotype(object):
                 cm[to, fr] = weight
         
         # Reorder the nodes/connections
-        ff, node_types, bias = zip(*self.node_genes)
+        ff, node_types, bias, response = zip(*self.node_genes)
         order = [i for _,i in sorted(zip(ff, xrange(len(ff))))]
         cm = cm[:,order][order,:]
         node_types = np.array(node_types)[order]
         bias = np.array(bias)[order]
+        response = np.array(response)[order]
+        # Then, we multiply all the incoming connection weights by the response
+        cm *= np.atleast_2d(response).T
+        # Finally, add the bias as incoming weights from node-0
         cm = np.hstack( (np.atleast_2d(bias).T, cm) )
         cm = np.insert(cm, 0, 0.0, axis=0)
         # TODO: this is a bit ugly, we duplicate the first node type for the bias node 
         node_types = [node_types[0]] + list(node_types)
+        
         
         return cm, node_types
         
@@ -269,6 +288,7 @@ class NEATSpecies(object):
         self.age                = 0
         self.avg_fitness        = 0
         self.no_improvement_age = 0
+        self.has_best           = False
                 
         
 class NEATPopulation(object):
@@ -411,11 +431,12 @@ class NEATPopulation(object):
                 specie.no_improvement_age += 1
             else:
                 specie.no_improvement_age = 0
+            specie.has_best = self.champions[-1] in specie.members
         
         # Remove stagnated species
         # This is implemented as in neat-python, which resets the
         # no_improvement_age when the average increases
-        self.species = filter(lambda s: s.no_improvement_age < self.stagnation_age, self.species)
+        self.species = filter(lambda s: s.no_improvement_age < self.stagnation_age or s.has_best, self.species)
         
         # Average fitness of each species
         avg_fitness = np.array([specie.avg_fitness for specie in self.species])
@@ -468,7 +489,6 @@ class NEATPopulation(object):
             print "== Generation %d ==" % self.generation
             print "Best (%.2f): %s" % (self.champions[-1].neat_fitness, self.champions[-1])
             print "Species: %s" % ([len(s.members) for s in self.species])
-            print "Avg: %s" % ([s.avg_fitness for s in self.species])
             print "Solved: %s" % (self.solved_at)
         
         self.generation += 1 
