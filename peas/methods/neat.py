@@ -458,7 +458,6 @@ class NEATPopulation(object):
         
         if innovations:
             self.global_innov = max(innovations.itervalues())
-            
         
         ## STATS
         self.stats['fitness_avg'].append(np.mean([ind.neat_fitness for ind in pop]))
