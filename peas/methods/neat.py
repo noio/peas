@@ -265,6 +265,7 @@ class NEATSpecies(object):
     def __init__(self, initial_member):
         self.members            = [initial_member]
         self.representative     = initial_member
+        self.offspring          = 0
         self.age                = 0
         self.avg_fitness        = 0
         self.no_improvement_age = 0
@@ -400,18 +401,7 @@ class NEATPopulation(object):
                                 "a callable, or an object with a method 'solve'.")
             if solved and self.solved_at is None:
                 self.solved_at = self.generation
-        
-        ## STATS
-        self.stats['fitness_avg'].append(np.mean([ind.neat_fitness for ind in pop]))
-        self.stats['fitness_max'].append(self.champions[-1].neat_fitness)
-        self.stats['solved'].append( self.solved_at is not None )
-        
-        if self.verbose:
-            print "== Generation %d ==" % self.generation
-            print "Best (%.2f): %s" % (self.champions[-1].neat_fitness, self.champions[-1])
-            print "Species: %s" % ([len(s.members) for s in self.species])
-            print "Solved: %s" % (self.solved_at)
-        
+
         ## REPRODUCE
         
         for specie in self.species:
@@ -432,17 +422,23 @@ class NEATPopulation(object):
 
         # Adjust based on age
         age = np.array([specie.age for specie in self.species])
-        avg_fitness[age < self.young_age] *= self.young_multiplier
-        avg_fitness[age > self.old_age] *= self.old_multiplier
+        for specie in self.species:
+            if specie.age < self.young_age:
+                specie.avg_fitness *= self.young_multiplier
+            if specie.age > self.old_age:
+                specie.avg_fitness *= self.old_multiplier
 
-        offspring = self.popsize * avg_fitness / avg_fitness.sum()
+        # Compute offspring amount
+        total_average = sum(specie.avg_fitness for specie in self.species)
+        for specie in self.species:
+            specie.offspring = int(round(self.popsize * specie.avg_fitness / total_average))
         
         # Remove species without offspring
-        self.species = list(np.array(self.species)[offspring > 0])
+        self.species = filter(lambda s: s.offspring > 0, self.species)
         
         # Produce offspring
         innovations = {} # Keep track of this round's innovations
-        for n_offspring, specie in zip(offspring, self.species):
+        for specie in self.species:
             # First we keep only the best individuals
             specie.members.sort(key=lambda ind: ind.neat_fitness, reverse=True)
             keep = max(1, int(round(len(specie.members) * self.survival)))
@@ -450,7 +446,7 @@ class NEATPopulation(object):
             # Keep one if elitism is set
             specie.members = specie.members[:1 if self.elitism else 0]
             # Produce offspring:
-            while len(specie.members) < n_offspring:
+            while len(specie.members) < specie.offspring:
                 # Perform tournament selection
                 k = min(len(specie.members), 2)
                 p1 = max(random.sample(specie.members, k), key=lambda ind:ind.neat_fitness)
@@ -462,6 +458,19 @@ class NEATPopulation(object):
         
         if innovations:
             self.global_innov = max(innovations.itervalues())
+            
+        
+        ## STATS
+        self.stats['fitness_avg'].append(np.mean([ind.neat_fitness for ind in pop]))
+        self.stats['fitness_max'].append(self.champions[-1].neat_fitness)
+        self.stats['solved'].append( self.solved_at is not None )
+        
+        if self.verbose:
+            print "== Generation %d ==" % self.generation
+            print "Best (%.2f): %s" % (self.champions[-1].neat_fitness, self.champions[-1])
+            print "Species: %s" % ([len(s.members) for s in self.species])
+            print "Avg: %s" % ([s.avg_fitness for s in self.species])
+            print "Solved: %s" % (self.solved_at)
         
         self.generation += 1 
         
