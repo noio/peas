@@ -345,6 +345,7 @@ class NEATPopulation(object):
         """
         self.species      = [] # List of species
         self.global_innov = 0
+        self.innovations = {} # Keep track of global innovations
                 
         # Keep track of some history
         self.champions    = []
@@ -458,7 +459,7 @@ class NEATPopulation(object):
         self.species = filter(lambda s: s.offspring > 0, self.species)
         
         # Produce offspring
-        innovations = {} # Keep track of this round's innovations
+        
         for specie in self.species:
             # First we keep only the best individuals
             specie.members.sort(key=lambda ind: ind.neat_fitness, reverse=True)
@@ -474,11 +475,11 @@ class NEATPopulation(object):
                 p2 = max(random.sample(specie.members, k), key=lambda ind:ind.neat_fitness)
                 # Mate and mutate
                 child = p1.mate(p2)
-                child.mutate(innovations=innovations, global_innov=self.global_innov)
+                child.mutate(innovations=self.innovations, global_innov=self.global_innov)
                 specie.members.append( child )
         
-        if innovations:
-            self.global_innov = max(innovations.itervalues())
+        if self.innovations:
+            self.global_innov = max(self.innovations.itervalues())
         
         ## STATS
         self.stats['fitness_avg'].append(np.mean([ind.neat_fitness for ind in pop]))
@@ -490,6 +491,7 @@ class NEATPopulation(object):
             print "Best (%.2f): %s" % (self.champions[-1].neat_fitness, self.champions[-1])
             print "Species: %s" % ([len(s.members) for s in self.species])
             print "Solved: %s" % (self.solved_at)
+            print "Age: %s" % ([s.age for s in self.species])
         
         self.generation += 1 
         
