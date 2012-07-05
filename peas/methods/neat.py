@@ -33,13 +33,13 @@ class NEATGenotype(object):
                  types=['tanh'],
                  feedforward=False,
                  response_default=4.924273,
-                 bias_as_node=True,
+                 bias_as_node=False,
                  prob_add_node=0.03,
                  prob_add_conn=0.05,
                  prob_mutate_weight=0.9,
                  prob_reenable_conn=0.01,
                  prob_mutate_bias=0.2,
-                 prob_mutate_response=0.0,
+                 prob_mutate_response=0.2,
                  prob_mutate_type=0.2,
                  stdev_mutate_weight=2.0,
                  stdev_mutate_bias=0.5,
@@ -82,7 +82,7 @@ class NEATGenotype(object):
         # genotype, i.e., connect all input nodes
         # to the output node.
         
-        if bias_as_node:
+        if self.bias_as_node:
             self.inputs += 1
         
         for i in xrange(self.inputs + self.outputs):
@@ -271,7 +271,7 @@ class NEATGenotype(object):
         # Then, we multiply all the incoming connection weights by the response
         cm *= np.atleast_2d(response).T
         # Finally, add the bias as incoming weights from node-0
-        if not bias_as_node:
+        if not self.bias_as_node:
             cm = np.hstack( (np.atleast_2d(bias).T, cm) )
             cm = np.insert(cm, 0, 0.0, axis=0)
             # TODO: this is a bit ugly, we duplicate the first node type for the bias node 
