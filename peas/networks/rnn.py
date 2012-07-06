@@ -59,14 +59,8 @@ ACTIVATION_FUNCS = {
 
 ### CLASSES ### 
 
-class Network(object):
-    """ A neural network. Does not take into account
-        recursive connections, so activation is only propagated
-        enough for all forward connections to be used.
-        
-        >>> n = Network.from_matrix(np.array([[0, 0], [1, 0]])).make_feedforward()
-        >>> n.feed(np.array([1]), add_bias=False)
-        array([ 1.        ,  0.991...])
+class NeuralNetwork(object):
+    """ A neural network. Can have recursive connections.
     """
     
     def from_matrix(self, matrix, node_types=['sigmoid']):
@@ -83,7 +77,6 @@ class Network(object):
             self.node_types *= n_nodes
         self.act = np.zeros(self.cm.shape[0])
         
-    @classmethod
     def from_neatchromosome(self, chromosome, node_type='sigmoid'):
         """ Construct a network from a Chromosome instance, from
             the neat-python package. This is a connection-list

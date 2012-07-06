@@ -9,7 +9,7 @@ import random
 import numpy as np
 
 # Local
-from ..networks import rnn
+from ..networks.rnn import NeuralNetwork
 
 class PoleBalanceTask(object):
     """ Double pole balancing task. 
@@ -104,8 +104,8 @@ class PoleBalanceTask(object):
     def evaluate(self, network, verbose=False):
         """ Perform a single run of this task """
         # Convert to a network if it is not.
-        if not isinstance(network, rnn.Network):
-            network = rnn.Network(network)
+        if not isinstance(network, NeuralNetwork):
+            network = NeuralNetwork(network)
         
         
         steps, states, _ = self._loop(network, max_steps=self.max_steps, verbose=verbose)
@@ -137,8 +137,8 @@ class PoleBalanceTask(object):
             network 'fails' the task. 
         """
         # Convert to a network if it is not.
-        if not isinstance(network, rnn.Network):
-            network = rnn.Network(network)
+        if not isinstance(network, NeuralNetwork):
+            network = NeuralNetwork(network)
         
         steps, _, _ = self._loop(network, max_steps=100000)
         if steps < 100000:
@@ -165,8 +165,8 @@ class PoleBalanceTask(object):
         matplotlib.use('Agg',warn=False)
         import matplotlib.pyplot as plt
         # Convert to a network if it is not.
-        if not isinstance(network, rnn.Network):
-            network = rnn.Network(network)
+        if not isinstance(network, NeuralNetwork):
+            network = NeuralNetwork(network)
         
         fig = plt.figure()
         steps, states, actions = self._loop(network, max_steps=1000)
