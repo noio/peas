@@ -81,7 +81,7 @@ class Network(object):
         if len(self.node_types) == 1:
             self.single_type = self.node_types[0]
             self.node_types *= n_nodes
-        self.act = np.zeros(net.cm.shape[0])
+        self.act = np.zeros(self.cm.shape[0])
         
     @classmethod
     def from_neatchromosome(self, chromosome, node_type='sigmoid'):
@@ -134,6 +134,7 @@ class Network(object):
         if source is not None:
             if isinstance(source, evolution.neat.NEATGenotype):
                 self.from_matrix(*source.get_network_data())
+            # TODO: maybe remove this neat-python constructor
             elif isinstance(source, neat.chromosome.Chromosome):
                 self.from_neatchromosome(source)
             else:

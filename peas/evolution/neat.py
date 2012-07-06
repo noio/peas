@@ -498,7 +498,7 @@ class NEATPopulation(object):
         self.stats['solved'].append( self.solved_at is not None )
         
         if self.verbose:
-            print "== Generation %d ==" % self.generation
+            print "\n== Generation %d ==" % self.generation
             print "Best (%.2f): %s" % (self.champions[-1].neat_fitness, self.champions[-1])
             print "Species: %s" % ([len(s.members) for s in self.species])
             print "Solved: %s" % (self.solved_at)
