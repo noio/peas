@@ -34,6 +34,7 @@ class NEATGenotype(object):
                  topology=None,
                  feedforward=False,
                  response_default=4.924273,
+                 initial_weight_stdev=2.0,
                  bias_as_node=False,
                  prob_add_node=0.03,
                  prob_add_conn=0.05,
@@ -42,7 +43,7 @@ class NEATGenotype(object):
                  prob_mutate_bias=0.2,
                  prob_mutate_response=0.2,
                  prob_mutate_type=0.2,
-                 stdev_mutate_weight=2.0,
+                 stdev_mutate_weight=1.5,
                  stdev_mutate_bias=0.5,
                  stdev_mutate_response=0.5,
                  weight_range=(-50., 50.),
@@ -51,12 +52,13 @@ class NEATGenotype(object):
                  distance_weight=0.4):
         
         # Settings
-        self.inputs           = inputs
-        self.outputs          = outputs
-        self.types            = types
-        self.feedforward      = feedforward
-        self.response_default = response_default
-        self.bias_as_node     = bias_as_node
+        self.inputs                 = inputs
+        self.outputs                = outputs
+        self.types                  = types
+        self.feedforward            = feedforward
+        self.response_default       = response_default
+        self.initial_weight_stdev   = initial_weight_stdev
+        self.bias_as_node           = bias_as_node
         
         self.prob_add_conn        = prob_add_conn
         self.prob_add_node        = prob_add_node
@@ -95,7 +97,7 @@ class NEATGenotype(object):
             innov = 0
             for i in xrange(self.inputs):
                 for j in xrange(self.inputs, self.inputs + self.outputs):
-                    self.conn_genes[(i, j)] = [innov, i, j, np.random.normal(0.0, self.stdev_mutate_weight), True]
+                    self.conn_genes[(i, j)] = [innov, i, j, np.random.normal(0.0, self.initial_weight_stdev), True]
                     innov += 1
         else:
             # If an initial topology is given, use that:
@@ -105,7 +107,7 @@ class NEATGenotype(object):
                 self.node_genes.append( [i * 1024.0, random.choice(self.types), 0.0, self.response_default] )
             innov = 0
             for fr, to in topology:
-                self.conn_genes[(fr, to)] = [innov, fr, to, np.random.normal(0.0, self.stdev_mutate_weight), True]
+                self.conn_genes[(fr, to)] = [innov, fr, to, np.random.normal(0.0, self.initial_weight_stdev), True]
                 innov += 1
                 
     def mutate(self, innovations={}, global_innov=0):
@@ -318,6 +320,7 @@ class NEATPopulation(object):
                  reset_innovations=False,
                  survival=0.2,
                  elitism=True,
+                 tournament_selection_k=3,
                  young_age=10,
                  young_multiplier=1.2,
                  old_age=30,
@@ -338,6 +341,7 @@ class NEATPopulation(object):
         self.reset_innovations       = reset_innovations
         self.survival                = survival
         self.elitism                 = elitism
+        self.tournament_selection_k  = tournament_selection_k
         self.young_age               = young_age
         self.young_multiplier        = young_multiplier
         self.old_age                 = old_age
@@ -359,6 +363,8 @@ class NEATPopulation(object):
             self._evolve(evaluator, solution)
             if self.solved_at is not None and self.stop_when_solved:
                 break
+                
+        return {'stats': self.stats, 'champions': self.champions}
 
     def _reset(self):
         """ Resets the state of this population.
@@ -493,7 +499,7 @@ class NEATPopulation(object):
             # Produce offspring:
             while len(specie.members) < specie.offspring:
                 # Perform tournament selection
-                k = min(len(specie.members), 2)
+                k = min(len(specie.members), self.tournament_selection_k)
                 p1 = max(random.sample(specie.members, k), key=lambda ind:ind.neat_fitness)
                 p2 = max(random.sample(specie.members, k), key=lambda ind:ind.neat_fitness)
                 # Mate and mutate

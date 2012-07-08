@@ -107,7 +107,6 @@ class PoleBalanceTask(object):
         if not isinstance(network, NeuralNetwork):
             network = NeuralNetwork(network)
         
-        
         steps, states, _ = self._loop(network, max_steps=self.max_steps, verbose=verbose)
         
         if network.node_types[-1].__name__ != 'tanh':

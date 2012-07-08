@@ -52,7 +52,9 @@ ACTIVATION_FUNCS = {
     'linear': linear,
     'gauss': gauss,
     'sigmoid': sigmoid,
+    'exp': sigmoid,
     'tanh': np.tanh,
+    None : linear
 }
 
 
@@ -77,7 +79,7 @@ class NeuralNetwork(object):
             self.node_types *= n_nodes
         self.act = np.zeros(self.cm.shape[0])
         
-    def from_neatchromosome(self, chromosome, node_type='sigmoid'):
+    def from_neatchromosome(self, chromosome):
         """ Construct a network from a Chromosome instance, from
             the neat-python package. This is a connection-list
             representation.
@@ -98,8 +100,8 @@ class NeuralNetwork(object):
         self.cm = np.zeros((len(node_order), len(node_order)))
         # Add bias connections
         for id, node in nodes.items():
-            self.cm[id, 0] = node.bias
-            self.cm[id, 1:] = node.response
+            self.cm[node_order.index(id), 0] = node.bias
+            self.cm[node_order.index(id), 1:] = node.response
         # Add the connections
         for conn in chromosome.conn_genes:
             if conn.enabled:
@@ -111,8 +113,9 @@ class NeuralNetwork(object):
         if isinstance(chromosome, neat.chromosome.FFChromosome):
             if np.triu(self.cm).any():
                 raise Exception("NEAT Chromosome does not describe feedforward network.")
-        self.node_types = [ACTIVATION_FUNCS[node_type]] * len(node_order)
-        self.single_type = ACTIVATION_FUNCS[node_type]
+        node_order.remove('bias')
+        self.node_types = [ACTIVATION_FUNCS[nodes[i].activation_type] for i in node_order]
+        self.node_types = [linear] + self.node_types
         self.act = np.zeros(self.cm.shape[0])
     
     def __init__(self, source=None):
