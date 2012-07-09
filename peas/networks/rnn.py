@@ -78,6 +78,7 @@ class NeuralNetwork(object):
             self.single_type = self.node_types[0]
             self.node_types *= n_nodes
         self.act = np.zeros(self.cm.shape[0])
+        return self
         
     def from_neatchromosome(self, chromosome):
         """ Construct a network from a Chromosome instance, from
@@ -117,6 +118,7 @@ class NeuralNetwork(object):
         self.node_types = [ACTIVATION_FUNCS[nodes[i].activation_type] for i in node_order]
         self.node_types = [linear] + self.node_types
         self.act = np.zeros(self.cm.shape[0])
+        return self
     
     def __init__(self, source=None):
         # Set instance vars
@@ -165,10 +167,7 @@ class NeuralNetwork(object):
             input_activation = np.hstack((1.0, input_activation))
         
         if input_activation.size >= self.act.size:
-            print self.act.shape
-            print input_activation.shape
-            print self.cm.shape
-            raise Exception("More input values than input nodes.")
+            raise Exception("More input values (%s) than input nodes (%s)." % (input_activations.shape, self.act.shape))
         
         input_size = min(self.act.size - 1, input_activation.size)
         

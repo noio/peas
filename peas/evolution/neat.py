@@ -5,6 +5,7 @@
 """
 
 ### IMPORTS ###
+import sys
 import random
 import datetime
 from copy import deepcopy
@@ -12,7 +13,7 @@ from itertools import product
 
 # Libs
 import numpy as np
-np.seterr(all='raise')
+np.seterr(over='raise', divide='raise')
 
 # Package
 
@@ -410,6 +411,9 @@ class NEATPopulation(object):
             else:
                 raise Exception("Evaluator must be a callable or object" \
                                 "with a callable attribute 'evaluate'.")
+            if self.verbose:
+                sys.stdout.write('#')
+                sys.stdout.flush()
         
         ## SPECIATE
         # Select random representatives
@@ -495,7 +499,6 @@ class NEATPopulation(object):
         for specie in self.species:
             # First we keep only the best individuals
             specie.members.sort(key=lambda ind: ind.neat_fitness, reverse=True)
-            print [ind.neat_fitness for ind in specie.members]
             keep = max(1, int(round(len(specie.members) * self.survival)))
             parents = specie.members[:keep]
             # Keep one if elitism is set
