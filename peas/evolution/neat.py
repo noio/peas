@@ -306,7 +306,9 @@ class NEATSpecies(object):
         self.representative     = initial_member
         self.offspring          = 0
         self.age                = 0
-        self.avg_fitness        = 0
+        self.avg_fitness        = 0.
+        self.max_fitness        = 0.
+        self.max_fitness_prev   = 0.
         self.no_improvement_age = 0
         self.has_best           = False
                 
@@ -452,9 +454,10 @@ class NEATPopulation(object):
         ## REPRODUCE
         
         for specie in self.species:
-            specie.avg_fitness_prev = specie.avg_fitness
+            specie.max_fitness_prev = specie.max_fitness
             specie.avg_fitness = np.mean([ind.neat_fitness for ind in specie.members])
-            if specie.avg_fitness <= specie.avg_fitness_prev:
+            specie.max_fitness = np.max([ind.neat_fitness for ind in specie.members])
+            if specie.max_fitness <= specie.max_fitness_prev:
                 specie.no_improvement_age += 1
             else:
                 specie.no_improvement_age = 0
@@ -492,6 +495,7 @@ class NEATPopulation(object):
         for specie in self.species:
             # First we keep only the best individuals
             specie.members.sort(key=lambda ind: ind.neat_fitness, reverse=True)
+            print [ind.neat_fitness for ind in specie.members]
             keep = max(1, int(round(len(specie.members) * self.survival)))
             parents = specie.members[:keep]
             # Keep one if elitism is set

@@ -15,7 +15,7 @@ class PoleBalanceTask(object):
     """ Double pole balancing task. 
     """
     
-    def __init__(self, gravity=-9.81, cartmass=1.0, 
+    def __init__(self, gravity=-9.81, cart_mass=1.0, 
                        pole_mass=[0.1, 0.01], 
                        pole_length=[0.5, 0.05],
                        track_limit=2.4,
@@ -26,9 +26,24 @@ class PoleBalanceTask(object):
                        penalize_oscillation=True,
                        velocities=False,
                        max_steps=1000):
+        """ Constructor for PoleBalanceTask 
+        
+            :param gravity:         Gravity constant.
+            :param cartmass:        Mass of the cart.
+            :param pole_mass:       List of the mass of each pole.
+            :param pole_length:     List of the length of each pole, respectively.
+            :param track_limit:     Length of the track that the cart is on.
+            :param failure_angle:   Pole angle in radians at which the task is failed.
+            :param timestep:        Length of each time step.
+            :param force_magnitude: The force that is exerted when an action of 1.0 is performed.
+            :param start_random:    Set the pole to a random position on each trial.
+            :param penalize_oscillation: Uses the alternative fitness function described in (Stanley, 2002).
+            :param velocities:      Known velocities make the task markovian.
+            :param max_steps:       Maximum length of the simulation.
+        """
         
         self.g  = gravity
-        self.mc = cartmass
+        self.mc = cart_mass
         self.mp = np.array(pole_mass)
         self.l  = np.array(pole_length)
         self.h  = track_limit
@@ -46,7 +61,7 @@ class PoleBalanceTask(object):
         """
         x, dx, theta, dtheta = state
         
-        f = (action - 0.5) * self.f * 2.0;
+        f = (min(1.0, max(-1.0, action)) - 0.5) * self.f * 2.0;
         
         # Alternate equations
         fi = self.mp * self.l * dtheta**2 * np.sin(theta) + (3.0/4) * self.mp * np.cos(theta) * self.g * np.sin(theta)
