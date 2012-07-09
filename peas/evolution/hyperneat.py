@@ -11,6 +11,8 @@ import numpy as np
 # Local
 from ..networks.rnn import NeuralNetwork
 
+
+
 class HyperNEATDeveloper(object):
     
     def __init__(self, substrate=None, substrate_shape=None, 
@@ -55,12 +57,13 @@ class HyperNEATDeveloper(object):
         # Initialize connectivity matrix  
         cm = np.zeros((len(self.substrate), len(self.substrate)))
             
-        w_mul = self.weight_range / (self.weight_range - self.min_weight)
         for (i, fr), (j, to) in product(enumerate(self.substrate), repeat=2):
             weight = network.feed(fr + to)[-1]
-            if abs(weight) < self.min_weight:
-                continue
-            cm[j, i] = (weight - (-self.min_weight if weight < 0 else self.min_weight)) * w_mul
+            cm[j, i] = weight
+            
+        cm[np.abs(cm) < self.min_weight] = 0
+        cm -= (np.sign(cm) * self.min_weight)
+        cm *= self.weight_range / (self.weight_range - self.min_weight)
             
         cm = np.clip(cm, -self.weight_range, self.weight_range)
         net = NeuralNetwork().from_matrix(cm, node_types=[self.node_type])
