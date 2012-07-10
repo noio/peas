@@ -15,6 +15,8 @@ from ..networks.rnn import NeuralNetwork
 
 class HyperNEATDeveloper(object):
     
+    """ HyperNEAT developer object."""
+    
     def __init__(self, substrate=None, substrate_shape=None, 
                  sandwich=False, 
                  weight_range=3.0, 
@@ -44,6 +46,11 @@ class HyperNEATDeveloper(object):
         
         
     def convert(self, network):
+        """ Performs conversion. 
+            
+            :param network: Any object that is convertible to a :class:`~peas.networks.NeuralNetwork`.
+        """
+        
         # Cast input to a neuralnetwork if it isn't
         if not isinstance(network, NeuralNetwork):
             network = NeuralNetwork(network)

@@ -315,6 +315,9 @@ class NEATSpecies(object):
                 
         
 class NEATPopulation(object):
+    """ A population object for NEAT, it contains the selection
+        and reproduction methods.
+    """
     
     def __init__(self, 
                  geno_factory,
@@ -355,6 +358,7 @@ class NEATPopulation(object):
         
     def epoch(self, evaluator, generations, solution=None, reset=True):
         """ Runs an evolutionary epoch 
+
             :param evaluator:    Either a function or an object with a function
                                  named 'evaluate' that returns a given individual's
                                  fitness.
