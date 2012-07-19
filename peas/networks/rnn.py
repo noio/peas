@@ -10,7 +10,7 @@ import numpy as np
 import neat.chromosome
 
 # Local
-from .. import evolution
+from ..methods.neat import NEATGenotype
 
 # Shortcuts
 inf  = float('inf')
@@ -130,7 +130,7 @@ class NeuralNetwork(object):
         self.original_shape = None
         
         if source is not None:
-            if isinstance(source, evolution.neat.NEATGenotype):
+            if isinstance(source, NEATGenotype):
                 self.from_matrix(*source.get_network_data())
             # TODO: maybe remove this neat-python constructor
             elif isinstance(source, neat.chromosome.Chromosome):
