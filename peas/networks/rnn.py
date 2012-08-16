@@ -7,7 +7,10 @@ import sys
 import numpy as np
 
 # Libraries
-import neat.chromosome
+try:
+    import neat.chromosome
+except ImportError:
+    pass
 
 # Local
 from ..methods.neat import NEATGenotype
@@ -132,7 +135,6 @@ class NeuralNetwork(object):
         if source is not None:
             if isinstance(source, NEATGenotype):
                 self.from_matrix(*source.get_network_data())
-            # TODO: maybe remove this neat-python constructor
             elif isinstance(source, neat.chromosome.Chromosome):
                 self.from_neatchromosome(source)
             else:
