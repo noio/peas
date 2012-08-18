@@ -5,6 +5,7 @@
 
 import sys
 import numpy as np
+np.seterr(over='warn', divide='raise')
 
 # Libraries
 try:
@@ -16,6 +17,7 @@ except ImportError:
 from ..methods.neat import NEATGenotype
 
 # Shortcuts
+
 inf  = float('inf')
 
 ### FUNCTIONS ###

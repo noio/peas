@@ -13,7 +13,7 @@ from itertools import product
 
 # Libs
 import numpy as np
-np.seterr(over='raise', divide='raise')
+np.seterr(over='warn', divide='raise')
 
 # Package
 
@@ -356,18 +356,19 @@ class NEATPopulation(object):
         self.stop_when_solved        = stop_when_solved
         self.verbose                 = verbose
         
-    def epoch(self, evaluator, generations, solution=None, reset=True):
+    def epoch(self, evaluator, generations, solution=None, reset=True, callback=None):
         """ Runs an evolutionary epoch 
 
             :param evaluator:    Either a function or an object with a function
                                  named 'evaluate' that returns a given individual's
                                  fitness.
+            :param callback:     Function that is called at the end of each generation.
         """
         if reset:
             self._reset()
         
         for _ in xrange(generations):
-            self._evolve(evaluator, solution)
+            self._evolve(evaluator, solution, callback)
             if self.solved_at is not None and self.stop_when_solved:
                 break
                 
@@ -394,7 +395,7 @@ class NEATPopulation(object):
             for member in specie.members:
                 yield member
         
-    def _evolve(self, evaluator, solution=None):
+    def _evolve(self, evaluator, solution=None, callback=None):
         """ A single evolutionary step .
         """
         # Unpack species
@@ -533,6 +534,9 @@ class NEATPopulation(object):
             print "Solved: %s" % (self.solved_at)
             print "Age: %s" % ([s.age for s in self.species])
             print "No improvement: %s" % ([s.no_improvement_age for s in self.species])
+            
+        if callback is not None:
+            callback(self)
         
         self.generation += 1 
         

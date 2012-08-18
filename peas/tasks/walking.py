@@ -11,14 +11,20 @@ import pymunk
 import numpy as np
 
 # Local
+from ..networks.rnn import NeuralNetwork
+
+# Shortcuts
+pi = np.pi
+
 
 class WalkingTask(object):
     """ Walking gait task.
     """
     
-    def __init__(self, maxsteps=6000, tracklength=1000):
+    def __init__(self, maxsteps=6000, tracklength=1000, maxrate=2.0):
         self.maxsteps = maxsteps
         self.tracklength = tracklength
+        self.maxrate = maxrate
         
     def makeleg(self, parent, position=(0,20), l=40, w=10):
         # Upperleg
@@ -26,10 +32,12 @@ class WalkingTask(object):
         upperleg.position = pymunk.Vec2d(parent.position) + pymunk.Vec2d(position) + pymunk.Vec2d(0, l/2.0 - w/2.0)
         shape = pymunk.Poly.create_box(upperleg, (w,l))
         shape.group = 1
+        shape.friction = 2.0
         hip = pymunk.PivotJoint(parent, upperleg, pymunk.Vec2d(parent.position) + pymunk.Vec2d(position))
-        hipmotor = pymunk.SimpleMotor(parent, upperleg, -1)
+        hipmotor = pymunk.SimpleMotor(parent, upperleg, 0)
+        hiplimit = pymunk.RotaryLimitJoint(parent, upperleg, -0.9*pi, 0.1*pi)
         hipmotor.max_force = 1e7
-        self.space.add(hip, hipmotor, upperleg, shape)
+        self.space.add(hip, hipmotor, hiplimit, upperleg, shape)
         # Lower leg
         l *= 1.2
         lowerleg = pymunk.Body(10.0, pymunk.moment_for_box(5, l, w))
@@ -38,12 +46,17 @@ class WalkingTask(object):
         shape.group = 1
         shape.friction = 2.0
         knee = pymunk.PivotJoint(upperleg, lowerleg, pymunk.Vec2d(upperleg.position) + pymunk.Vec2d(0, l/2.0 - w/2.0))
-        kneemotor = pymunk.SimpleMotor(upperleg, lowerleg, -2)
+        kneemotor = pymunk.SimpleMotor(upperleg, lowerleg, 0)
+        kneelimit = pymunk.RotaryLimitJoint(upperleg, lowerleg, -0.1*pi, 0.9*pi)
         kneemotor.max_force = 1e7
-        self.space.add(knee, kneemotor, lowerleg, shape)
+        self.space.add(knee, kneemotor, kneelimit, lowerleg, shape)
+        return (hipmotor, kneemotor), (upperleg, lowerleg)
 
         
     def evaluate(self, network, draw=False):
+        if not isinstance(network, NeuralNetwork):
+            network = NeuralNetwork(network)
+        
         if draw:
             import pygame
             pygame.init()
@@ -74,12 +87,13 @@ class WalkingTask(object):
         storso = pymunk.Poly.create_box(torso, (40, 50))
         storso.group = 1
         storso.collision_type = 1
+        storso.friction = 2.0
         # space.add_static(storso)
         space.add(torso, storso)
 
         # Legs
-        self.makeleg(torso)
-        self.makeleg(torso)
+        (hip1, knee1), leg1shapes = self.makeleg(torso)
+        (hip2, knee2), leg2shapes = self.makeleg(torso)
         
         # Collision callback
         def oncollide(space, arb):
@@ -89,9 +103,17 @@ class WalkingTask(object):
         for step in xrange(self.maxsteps):
             
             # Query network
-            torso_x = torso.position.x
             torso_y = torso.position.y
-            output = network.feed(np.array([torso_x, torso_y]))
+            torso_a = torso.angle
+            leg1_a = leg1shapes[0].angle
+            leg2_a = leg2shapes[0].angle
+            output = network.feed(np.array([torso_y, torso_a, leg1_a, leg2_a]))
+            
+            output = np.clip(output[-4:], -self.maxrate, self.maxrate)
+            hip1.rate = output[0]
+            hip2.rate = output[1]
+            knee1.rate = output[2]
+            knee2.rate = output[3]
             
             # Advance simulation
             space.step(1/50.0)
@@ -101,7 +123,8 @@ class WalkingTask(object):
             if torso.position.x > self.tracklength - 50:
                 break
             if self.touching_floor:
-                break
+                pass#break
+
             # Draw
             if draw:
                 # Clear
@@ -123,7 +146,8 @@ class WalkingTask(object):
             pygame.quit()
         
         distance = torso.position.x
-        print "Travelled %.2f in %d steps." % (distance, step)
+        # print "Travelled %.2f in %d steps." % (distance, step)
+        return distance
         
     def solve(self, network):
         return False
