@@ -433,7 +433,7 @@ class NEATPopulation(object):
         for individual in pop:
             found = False
             for specie in self.species:
-                if individual.distance(specie.representative) <= current_compatibility_threshold:
+                if individual.distance(specie.representative) <= self.current_compatibility_threshold:
                     specie.members.append(individual)
                     found = True
                     break
@@ -447,9 +447,9 @@ class NEATPopulation(object):
         
         # Ajust compatibility_threshold
         if len(self.species) < self.target_species:
-            current_compatibility_threshold -= self.compatibility_threshold_delta
+            self.current_compatibility_threshold -= self.compatibility_threshold_delta
         elif len(self.species) > self.target_species:
-            current_compatibility_threshold += self.compatibility_threshold_delta
+            self.current_compatibility_threshold += self.compatibility_threshold_delta
         
         ## CHAMPION
         self.champions.append(max(pop, key=lambda ind: ind.neat_fitness))
