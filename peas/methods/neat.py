@@ -343,20 +343,22 @@ class NEATPopulation(object):
                                  a new instance of a genotype.
 
         """
-        self.geno_factory            = geno_factory
-        self.popsize                 = popsize
-        self.compatibility_threshold = compatibility_threshold
-        self.reset_innovations       = reset_innovations
-        self.survival                = survival
-        self.elitism                 = elitism
-        self.tournament_selection_k  = tournament_selection_k
-        self.young_age               = young_age
-        self.young_multiplier        = young_multiplier
-        self.old_age                 = old_age
-        self.old_multiplier          = old_multiplier
-        self.stagnation_age          = stagnation_age
-        self.stop_when_solved        = stop_when_solved
-        self.verbose                 = verbose
+        self.geno_factory                  = geno_factory
+        self.popsize                       = popsize
+        self.compatibility_threshold       = compatibility_threshold
+        self.compatibility_threshold_delta = compatibility_threshold_delta
+        self.target_species                = target_species
+        self.reset_innovations             = reset_innovations
+        self.survival                      = survival
+        self.elitism                       = elitism
+        self.tournament_selection_k        = tournament_selection_k
+        self.young_age                     = young_age
+        self.young_multiplier              = young_multiplier
+        self.old_age                       = old_age
+        self.old_multiplier                = old_multiplier
+        self.stagnation_age                = stagnation_age
+        self.stop_when_solved              = stop_when_solved
+        self.verbose                       = verbose
         
     def epoch(self, evaluator, generations, solution=None, reset=True, callback=None):
         """ Runs an evolutionary epoch 
