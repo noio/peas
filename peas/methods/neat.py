@@ -323,6 +323,8 @@ class NEATPopulation(object):
                  geno_factory,
                  popsize=100,
                  compatibility_threshold=3.0,
+                 compatibility_threshold_delta=0.4,
+                 target_num_species=12,
                  reset_innovations=False,
                  survival=0.2,
                  elitism=True,
@@ -380,6 +382,7 @@ class NEATPopulation(object):
         self.species      = [] # List of species
         self.global_innov = 0
         self.innovations = {} # Keep track of global innovations
+        self.current_compatibility_threshold = self.compatibility_threshold
                 
         # Keep track of some history
         self.champions    = []
@@ -430,7 +433,7 @@ class NEATPopulation(object):
         for individual in pop:
             found = False
             for specie in self.species:
-                if individual.distance(specie.representative) <= self.compatibility_threshold:
+                if individual.distance(specie.representative) <= current_compatibility_threshold:
                     specie.members.append(individual)
                     found = True
                     break
@@ -442,6 +445,11 @@ class NEATPopulation(object):
         # Remove empty species
         self.species = filter(lambda s: len(s.members) > 0, self.species)
         
+        # Ajust compatibility_threshold
+        if len(self.species) < self.target_num_species:
+            current_compatibility_threshold -= self.compatibility_threshold_delta
+        elif len(self.species) > self.target_num_species:
+            current_compatibility_threshold += self.compatibility_threshold_delta
         
         ## CHAMPION
         self.champions.append(max(pop, key=lambda ind: ind.neat_fitness))

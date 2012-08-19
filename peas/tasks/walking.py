@@ -21,10 +21,11 @@ class WalkingTask(object):
     """ Walking gait task.
     """
     
-    def __init__(self, maxsteps=6000, tracklength=1000, maxrate=2.0):
+    def __init__(self, maxsteps=6000, tracklength=1000, maxrate=2.0, torsoheight=80):
         self.maxsteps = maxsteps
         self.tracklength = tracklength
         self.maxrate = maxrate
+        self.torsoheight = torsoheight
         
     def makeleg(self, parent, position=(0,20), l=40, w=10):
         # Upperleg
@@ -60,7 +61,7 @@ class WalkingTask(object):
         if draw:
             import pygame
             pygame.init()
-            screen = pygame.display.set_mode((self.tracklength, 600))
+            screen = pygame.display.set_mode((self.tracklength, 200))
             pygame.display.set_caption("Simulation")
             clock = pygame.time.Clock()
             running = True
@@ -75,16 +76,16 @@ class WalkingTask(object):
         # Floor
 
         floor = pymunk.Body()
-        floor.position = pymunk.Vec2d(self.tracklength/2.0 , 500.0)
+        floor.position = pymunk.Vec2d(self.tracklength/2.0 , 200)
         sfloor = pymunk.Poly.create_box(floor, (self.tracklength, 5))
         sfloor.friction = 1.0
         sfloor.collision_type = 1
         space.add_static(sfloor)
 
         # Torso
-        torso = pymunk.Body(10.0, pymunk.moment_for_box(10, 40, 50))
-        torso.position = pymunk.Vec2d(20.0,380.0)
-        storso = pymunk.Poly.create_box(torso, (40, 50))
+        torso = pymunk.Body(10.0, pymunk.moment_for_box(10, 40, self.torsoheight))
+        torso.position = pymunk.Vec2d(20.0, self.torsoheight)
+        storso = pymunk.Poly.create_box(torso, (40, self.torsoheight))
         storso.group = 1
         storso.collision_type = 1
         storso.friction = 2.0
@@ -109,7 +110,7 @@ class WalkingTask(object):
             leg2_a = leg2shapes[0].angle
             output = network.feed(np.array([torso_y, torso_a, leg1_a, leg2_a]))
             
-            output = np.clip(output[-4:], -self.maxrate, self.maxrate)
+            output = np.clip(output[-4:] * self.maxrate, -self.maxrate, self.maxrate)
             hip1.rate = output[0]
             hip2.rate = output[1]
             knee1.rate = output[2]
@@ -123,10 +124,11 @@ class WalkingTask(object):
             if torso.position.x > self.tracklength - 50:
                 break
             if self.touching_floor:
-                pass#break
+                break
 
             # Draw
             if draw:
+                print output
                 # Clear
                 screen.fill((255, 255, 255))
                 # Do all drawing
