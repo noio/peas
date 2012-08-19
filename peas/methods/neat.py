@@ -324,7 +324,7 @@ class NEATPopulation(object):
                  popsize=100,
                  compatibility_threshold=3.0,
                  compatibility_threshold_delta=0.4,
-                 target_num_species=12,
+                 target_species=12,
                  reset_innovations=False,
                  survival=0.2,
                  elitism=True,
@@ -446,9 +446,9 @@ class NEATPopulation(object):
         self.species = filter(lambda s: len(s.members) > 0, self.species)
         
         # Ajust compatibility_threshold
-        if len(self.species) < self.target_num_species:
+        if len(self.species) < self.target_species:
             current_compatibility_threshold -= self.compatibility_threshold_delta
-        elif len(self.species) > self.target_num_species:
+        elif len(self.species) > self.target_species:
             current_compatibility_threshold += self.compatibility_threshold_delta
         
         ## CHAMPION

@@ -23,7 +23,7 @@ inf  = float('inf')
 ### FUNCTIONS ###
 
 # Node functions
-def linear(x, clip=(-inf, inf)):
+def linear(x, clip=(-1.0, 1.0)):
     return np.clip(x, *clip)
 
 def gauss(x, mean=0.0, std=1.0):
