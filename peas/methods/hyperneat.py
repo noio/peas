@@ -21,7 +21,7 @@ class HyperNEATDeveloper(object):
                  sandwich=False, 
                  weight_range=3.0, 
                  min_weight=0.3,
-                 node_type='sigmoid'):
+                 node_type='tanh'):
         """ Constructor 
 
             :param substrate:      A list of node coordinates (tuples)
@@ -38,8 +38,7 @@ class HyperNEATDeveloper(object):
         self.node_type    = node_type
         
         if substrate_shape is not None:
-            self.substrate = list(product(np.linspace(-1.0, 1.0, substrate_shape[0]), 
-                                          np.linspace(-1.0, 1.0, substrate_shape[1])))
+            self.substrate = list(product(*[np.linspace(-1.0, 1.0, s) for s in substrate_shape]))
                                           
         if self.substrate is None:
             raise Exception("You must pass either substrate or substrate_shape")
