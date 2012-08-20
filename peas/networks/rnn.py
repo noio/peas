@@ -39,14 +39,6 @@ def sigmoid(x):
         True
     """
     return 1 / (1 + np.exp(-x))
-
-def sigmoid_alt(x):
-    """ Alternative sigmoid function from NEAT paper. 
-        >>> s = sigmoid( np.linspace(-3, 3, 10) )
-        >>> s[0] < 0.05 and s[-1] > 0.95
-        True
-    """
-    return 1 / (1 + np.exp(-4.8*x))
     
 
 ### CONSTANTS ###
@@ -251,6 +243,9 @@ class NeuralNetwork(object):
         else:
             prog = 'dot'
         G.draw(filename, prog=prog)
+        
+    def __str__(self):
+        return 'Neuralnet with %d nodes.' % (self.act.shape[0])
         
 
 if __name__ == '__main__':
