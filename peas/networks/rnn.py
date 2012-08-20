@@ -171,7 +171,7 @@ class NeuralNetwork(object):
             input_activation = np.hstack((1.0, input_activation))
         
         if input_activation.size >= self.act.size:
-            raise Exception("More input values (%s) than input nodes (%s)." % (input_activations.shape, self.act.shape))
+            raise Exception("More input values (%s) than nodes (%s)." % (input_activation.shape, self.act.shape))
         
         input_size = min(self.act.size - 1, input_activation.size)
         
