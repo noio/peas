@@ -170,9 +170,10 @@ class WalkingTask(object):
             torso_a = torso.angle
             sine = np.sin(step / 10.0)
             other = [torso_y, torso_a, sine, 1.0]
-            upperleg_angles = [leg.hip.angle() for leg in legs]
-            lowerleg_angles = [leg.knee.angle() for leg in legs]
-            act = network.feed(np.array(upperleg_angles + lowerleg_angles + other), add_bias=False)
+            hip_angles = [leg.hip.angle() for leg in legs]
+            knee_angles = [leg.knee.angle() for leg in legs]
+            net_input = np.vstack((other, hip_angles, knee_angles))
+            act = network.feed(net_input, add_bias=False)
 
             output = np.clip(act[-self.num_legs*2:] * self.max_rate, -1.0, 1.0) / 2.0 + 0.5
 
