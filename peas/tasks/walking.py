@@ -16,43 +16,99 @@ from ..networks.rnn import NeuralNetwork
 # Shortcuts
 pi = np.pi
 
+### FUNCTIONS ###
+
+def angle_fix(theta):
+    """ Fixes an angle to a value between -pi and pi.
+        
+        >>> angle_fix(-2*pi)
+        0.0
+    """
+    return ((theta + pi) % (2*pi)) - pi
+    
+### CLASSES ###
+
+class Joint(object):
+    """ Joint object, contains pivot, motor and limit"""
+    def __init__(self, a, b, position, range=(-pi, pi), max_rate=2.0):
+        self.pivot = pymunk.PivotJoint(a, b, position)
+        self.motor = pymunk.SimpleMotor(a, b, 0)
+        self.motor.max_force = 1e7
+        self.limit = pymunk.RotaryLimitJoint(a, b, range[0], range[1])
+        self.limit.max_force = 1e1
+        self.limit.max_bias = 0.5
+        self.max_rate = max_rate
+        
+    def angle(self):
+        return angle_fix(self.pivot.a.angle - self.pivot.b.angle)
+        
+    def set_target(self, target):
+        """ Target is between 0 and 1, representing min and max angle. """
+        cur = self.angle()
+        tgt = angle_fix(target * (self.limit.max - self.limit.min) + self.limit.min)
+        if tgt > cur + 0.1:
+            self.motor.rate = self.max_rate
+        elif tgt < cur - 0.1:
+            self.motor.rate = -self.max_rate
+        else: 
+            self.motor.rate = 0
+    
+class Leg(object):
+    """ Leg object, contains joints and shapes """
+    
+    def __init__(self, parent, position, walking_task):
+        self.walking_task = walking_task
+        (w, l) = walking_task.leg_length / 5.0, walking_task.leg_length
+        mass = w * l * 0.2
+        # Upper leg
+        upperleg = pymunk.Body(mass, pymunk.moment_for_box(mass, w, l))
+        upperleg.position = pymunk.Vec2d(parent.position) + pymunk.Vec2d(position) + pymunk.Vec2d(0, l/2.0 - w/2.0)
+        shape = pymunk.Poly.create_box(upperleg, (w,l))
+        shape.group = 1
+        shape.friction = 2.0
+        # Joints
+        pos = pymunk.Vec2d(parent.position) + pymunk.Vec2d(position)
+        hip = Joint(parent, upperleg, pos, (-0.1*pi, 0.9*pi), self.walking_task.max_rate)
+        walking_task.space.add(hip.pivot, hip.motor, hip.limit, upperleg, shape)
+
+        # Lower leg
+        lowerleg = pymunk.Body(mass, pymunk.moment_for_box(mass, w, l * 1.2))
+        lowerleg.position = pymunk.Vec2d(upperleg.position) + pymunk.Vec2d(0, l - w/2.0)
+        shape = pymunk.Poly.create_box(lowerleg, (w, l * 1.2))
+        shape.group = 1
+        shape.friction = 2.0
+        # Joints
+        pos =  pymunk.Vec2d(upperleg.position) + pymunk.Vec2d(0, l/2.0 - w/2.0)
+        knee = Joint(upperleg, lowerleg, pos, (-0.9*pi, 0.1*pi), self.walking_task.max_rate)
+        walking_task.space.add(knee.pivot, knee.motor, knee.limit, lowerleg, shape)
+        
+        self.upperleg = upperleg
+        self.lowerleg = lowerleg
+        self.hip = hip
+        self.knee = knee
+            
 
 class WalkingTask(object):
     """ Walking gait task.
     """
     
-    def __init__(self, maxsteps=6000, tracklength=1000, maxrate=2.0, torsoheight=80):
-        self.maxsteps = maxsteps
-        self.tracklength = tracklength
-        self.maxrate = maxrate
-        self.torsoheight = torsoheight
-        
-    def makeleg(self, parent, position=(0,20), l=40, w=10):
-        # Upperleg
-        upperleg = pymunk.Body(10.0, pymunk.moment_for_box(5, l, w))
-        upperleg.position = pymunk.Vec2d(parent.position) + pymunk.Vec2d(position) + pymunk.Vec2d(0, l/2.0 - w/2.0)
-        shape = pymunk.Poly.create_box(upperleg, (w,l))
-        shape.group = 1
-        shape.friction = 2.0
-        hip = pymunk.PivotJoint(parent, upperleg, pymunk.Vec2d(parent.position) + pymunk.Vec2d(position))
-        hipmotor = pymunk.SimpleMotor(parent, upperleg, 0)
-        hiplimit = pymunk.RotaryLimitJoint(parent, upperleg, -0.9*pi, 0.1*pi)
-        hipmotor.max_force = 1e7
-        self.space.add(hip, hipmotor, hiplimit, upperleg, shape)
-        # Lower leg
-        l *= 1.2
-        lowerleg = pymunk.Body(10.0, pymunk.moment_for_box(5, l, w))
-        lowerleg.position = pymunk.Vec2d(upperleg.position) + pymunk.Vec2d(0, l - w/2.0)
-        shape = pymunk.Poly.create_box(lowerleg, (w,l))
-        shape.group = 1
-        shape.friction = 2.0
-        knee = pymunk.PivotJoint(upperleg, lowerleg, pymunk.Vec2d(upperleg.position) + pymunk.Vec2d(0, l/2.0 - w/2.0))
-        kneemotor = pymunk.SimpleMotor(upperleg, lowerleg, 0)
-        kneelimit = pymunk.RotaryLimitJoint(upperleg, lowerleg, -0.1*pi, 0.9*pi)
-        kneemotor.max_force = 1e7
-        self.space.add(knee, kneemotor, kneelimit, lowerleg, shape)
-        return (hipmotor, kneemotor), (upperleg, lowerleg)
-
+    def __init__(self, max_steps=1000, 
+                       track_length=1000, 
+                       max_rate=2.0, 
+                       torso_height=40, 
+                       torso_density=0.2,
+                       leg_spacing=30,
+                       leg_length=30,
+                       num_legs=4):
+        # Settings
+        self.max_steps = max_steps
+        self.track_length = track_length
+        self.max_rate = max_rate
+        self.torso_height = torso_height
+        self.torso_density = torso_density
+        self.leg_spacing = leg_spacing
+        self.leg_length = leg_length
+        self.num_legs = num_legs
         
     def evaluate(self, network, draw=False):
         if not isinstance(network, NeuralNetwork):
@@ -61,7 +117,7 @@ class WalkingTask(object):
         if draw:
             import pygame
             pygame.init()
-            screen = pygame.display.set_mode((self.tracklength, 200))
+            screen = pygame.display.set_mode((self.track_length, 200))
             pygame.display.set_caption("Simulation")
             clock = pygame.time.Clock()
             running = True
@@ -70,22 +126,24 @@ class WalkingTask(object):
         # Initialize pymunk
         self.space = space = pymunk.Space()
         space.gravity = (0.0, 900.0)
-        space.damping = 0.9
+        space.damping = 0.7
         self.touching_floor = False
         # Create objects
         # Floor
 
         floor = pymunk.Body()
-        floor.position = pymunk.Vec2d(self.tracklength/2.0 , 200)
-        sfloor = pymunk.Poly.create_box(floor, (self.tracklength, 5))
+        floor.position = pymunk.Vec2d(self.track_length/2.0 , 210)
+        sfloor = pymunk.Poly.create_box(floor, (self.track_length, 40))
         sfloor.friction = 1.0
         sfloor.collision_type = 1
         space.add_static(sfloor)
 
         # Torso
-        torso = pymunk.Body(10.0, pymunk.moment_for_box(10, 40, self.torsoheight))
-        torso.position = pymunk.Vec2d(20.0, self.torsoheight)
-        storso = pymunk.Poly.create_box(torso, (40, self.torsoheight))
+        torsolength = 20 + (self.num_legs // 2 - 1) * self.leg_spacing
+        mass = torsolength * self.torso_height * self.torso_density
+        torso = pymunk.Body(mass, pymunk.moment_for_box(mass, torsolength, self.torso_height))
+        torso.position = pymunk.Vec2d(200, 200 - self.leg_length * 2 - self.torso_height)
+        storso = pymunk.Poly.create_box(torso, (torsolength, self.torso_height))
         storso.group = 1
         storso.collision_type = 1
         storso.friction = 2.0
@@ -93,42 +151,48 @@ class WalkingTask(object):
         space.add(torso, storso)
 
         # Legs
-        (hip1, knee1), leg1shapes = self.makeleg(torso)
-        (hip2, knee2), leg2shapes = self.makeleg(torso)
+        legs = []
+        for i in range(self.num_legs // 2):
+            x = 10 - torsolength / 2.0 + i * self.leg_spacing
+            y = self.torso_height / 2.0 - 10
+            legs.append( Leg(torso, (x,y), self) )
+            legs.append( Leg(torso, (x,y), self) )
         
         # Collision callback
         def oncollide(space, arb):
             self.touching_floor = True
         space.add_collision_handler(1, 1, post_solve=oncollide)
         
-        for step in xrange(self.maxsteps):
+        for step in xrange(self.max_steps):
             
             # Query network
             torso_y = torso.position.y
             torso_a = torso.angle
-            leg1_a = leg1shapes[0].angle
-            leg2_a = leg2shapes[0].angle
-            output = network.feed(np.array([torso_y, torso_a, leg1_a, leg2_a]))
-            
-            output = np.clip(output[-4:] * self.maxrate, -self.maxrate, self.maxrate)
-            hip1.rate = output[0]
-            hip2.rate = output[1]
-            knee1.rate = output[2]
-            knee2.rate = output[3]
+            sine = np.sin(step / 10.0)
+            other = [torso_y, torso_a, sine, 1.0]
+            upperleg_angles = [leg.hip.angle() for leg in legs]
+            lowerleg_angles = [leg.knee.angle() for leg in legs]
+            act = network.feed(np.array(upperleg_angles + lowerleg_angles + other), add_bias=False)
+
+            output = np.clip(act[-self.num_legs*2:] * self.max_rate, -1.0, 1.0) / 2.0 + 0.5
+
+            for i, leg in enumerate(legs):
+                leg.hip.set_target( output[i * 2] )
+                leg.knee.set_target( output[i * 2 + 1] )
             
             # Advance simulation
             space.step(1/50.0)
             # Check for success/failure
             if torso.position.x < 0:
                 break
-            if torso.position.x > self.tracklength - 50:
+            if torso.position.x > self.track_length - 50:
                 break
             if self.touching_floor:
                 break
 
             # Draw
             if draw:
-                print output
+                print act
                 # Clear
                 screen.fill((255, 255, 255))
                 # Do all drawing
@@ -142,7 +206,7 @@ class WalkingTask(object):
                         pygame.draw.lines(screen, (0,0,0), True, [(int(p.x), int(p.y)) for p in o.get_points()])
                 # Flip buffers
                 pygame.display.flip()
-                # clock.tick(50)
+                clock.tick(50)
                 
         if draw:
             pygame.quit()
