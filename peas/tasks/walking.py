@@ -30,6 +30,7 @@ def angle_fix(theta):
 
 class Joint(object):
     """ Joint object, contains pivot, motor and limit"""
+    
     def __init__(self, a, b, position, range=(-pi, pi), max_rate=2.0):
         self.pivot = pymunk.PivotJoint(a, b, position)
         self.motor = pymunk.SimpleMotor(a, b, 0)
@@ -111,6 +112,9 @@ class WalkingTask(object):
         self.num_legs = num_legs
         
     def evaluate(self, network, draw=False):
+        """ Evaluate the efficiency of the given network. Returns the
+            distance that the walker ran in the given time (max_steps).
+        """
         if not isinstance(network, NeuralNetwork):
             network = NeuralNetwork(network)
         
@@ -166,13 +170,19 @@ class WalkingTask(object):
         for step in xrange(self.max_steps):
             
             # Query network
+            input_width = max(len(legs), 4)
+            net_input = np.zeros((3, input_width))
             torso_y = torso.position.y
             torso_a = torso.angle
             sine = np.sin(step / 10.0)
-            other = [torso_y, torso_a, sine, 1.0]
             hip_angles = [leg.hip.angle() for leg in legs]
             knee_angles = [leg.knee.angle() for leg in legs]
-            net_input = np.vstack((other, hip_angles, knee_angles))
+            other = [torso_y, torso_a, sine, 1.0]
+            # Build a 2d input grid, 
+            # as in Clune 2009 Evolving Quadruped Gaits, p4
+            net_input[0, :len(legs)] = hip_angles
+            net_input[1, :len(legs)] = knee_angles
+            net_input[2, :4] = other
             act = network.feed(net_input, add_bias=False)
 
             output = np.clip(act[-self.num_legs*2:] * self.max_rate, -1.0, 1.0) / 2.0 + 0.5

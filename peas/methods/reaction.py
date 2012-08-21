@@ -46,6 +46,8 @@ class ReactionDeveloper(object):
             cm = np.mgrid[-1:1:os[0]*1j,-1:1:os[0]*1j].transpose((1,2,0))
         elif len(os) == 2:
             cm = np.mgrid[-1:1:os[0]*1j,-1:1:os[1]*1j,-1:1:os[0]*1j,-1:1:os[1]*1j].transpose(1,2,3,4,0)
+        else:
+            raise NotImplementedError("3+D substrates not supported yet.")
         # Insert a bias
         cm = np.insert(cm, 0, 1.0, -1)
         # Check if the genotype has enough weights
