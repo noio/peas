@@ -7,7 +7,6 @@
 ### IMPORTS ###
 import sys
 import random
-import datetime
 from copy import deepcopy
 from itertools import product
 
@@ -19,6 +18,7 @@ np.seterr(over='warn', divide='raise')
 
 # Shortcuts
 rand = random.random
+inf  = float('inf')
 
 
 ### CLASSES ###
@@ -34,6 +34,7 @@ class NEATGenotype(object):
                  types=['tanh'],
                  topology=None,
                  feedforward=False,
+                 max_depth=None,
                  response_default=4.924273,
                  initial_weight_stdev=2.0,
                  bias_as_node=False,
@@ -51,15 +52,19 @@ class NEATGenotype(object):
                  distance_excess=1.0,
                  distance_disjoint=1.0,
                  distance_weight=0.4):
+
+        """ Refer to the NEAT paper for an explanation of these parameters.
+        """
         
         # Settings
-        self.inputs                 = inputs
-        self.outputs                = outputs
-        self.types                  = types
-        self.feedforward            = feedforward
-        self.response_default       = response_default
-        self.initial_weight_stdev   = initial_weight_stdev
-        self.bias_as_node           = bias_as_node
+        self.inputs               = inputs
+        self.outputs              = outputs
+        self.types                = types
+        self.feedforward          = feedforward
+        self.max_depth            = max_depth
+        self.response_default     = response_default
+        self.initial_weight_stdev = initial_weight_stdev
+        self.bias_as_node         = bias_as_node
         
         self.prob_add_conn        = prob_add_conn
         self.prob_add_node        = prob_add_node
@@ -78,23 +83,33 @@ class NEATGenotype(object):
         self.distance_disjoint = distance_disjoint
         self.distance_weight   = distance_weight
         
-        self.node_genes = [] #: Tuples of (fforder, type, bias, response)
+        self.node_genes = [] #: Tuples of (fforder, type, bias, response, layer)
         self.conn_genes = {} #: Tuples of (innov, from, to, weight, enabled)
         
         
         if self.bias_as_node:
             self.inputs += 1
+            
+        max_layer = sys.maxint if (self.max_depth is None) else self.max_depth
         
         if topology is None:
             # The default method of creating a genotype
             # is to create a so called "fully connected"
             # genotype, i.e., connect all input nodes
             # to the output node.
-            for i in xrange(self.inputs + self.outputs):
+            
+            # Create input nodes
+            for i in xrange(self.inputs):
                 # We set the 'response' to 4.924273. Stanley doesn't mention having the response
                 # be subject to evolution, so this is #weird, but we'll do it because neat-python does.
-                self.node_genes.append( [i * 1024.0, random.choice(self.types), 0.0, self.response_default] )
+                self.node_genes.append( [i * 1024.0, random.choice(self.types), 0.0, self.response_default, 0] )
             
+            # Create output nodes
+            for i in xrange(self.outputs):
+                self.node_genes.append( [(self.inputs + i) * 1024.0, random.choice(self.types), 
+                                            0.0, self.response_default, max_layer] )
+            
+            # Create connections from each input to each output
             innov = 0
             for i in xrange(self.inputs):
                 for j in xrange(self.inputs, self.inputs + self.outputs):
@@ -120,14 +135,25 @@ class NEATGenotype(object):
         maxinnov = max(global_innov, max(cg[0] for cg in self.conn_genes.values()))
         
         if rand() < self.prob_add_node:
-            to_split = random.choice(self.conn_genes.values())
-            to_split[4] = False # Disable
+            possible_to_split = self.conn_genes.keys()
+            # If there is a max depth, we can only split connections that skip a layer.
+            # E.g. we can split a connection from layer 0 to layer 2, because the resulting
+            # node would be in layer 1. We cannot split a connection from layer 1 to layer 2,
+            # because that would create an inter-layer connection.
+            if self.max_depth is not None:
+                possible_to_split = [(fr, to) for (fr, to) in possible_to_split if
+                                        self.node_genes[fr][4] + 1 < self.node_genes[to][4]]
+            to_split = self.conn_genes[random.choice(possible_to_split)]
+            to_split[4] = False # Disable the old connection
             fr, to, w = to_split[1:4]
             avg_fforder = (self.node_genes[fr][0] + self.node_genes[to][0]) * 0.5
             # We assign a random function type to the node, which is #weird
             # because I thought that in NEAT these kind of mutations
             # initially don't affect the functionality of the network.
-            node_gene = [avg_fforder, random.choice(self.types), 0.0, self.response_default]
+            new_type = random.choice(self.types)
+            # We assign a 'layer' to the new node that is one lower than the target of the connection
+            layer = self.node_genes[fr][4] + 1
+            node_gene = [avg_fforder, new_type, 0.0, self.response_default, layer]
             new_id = len(self.node_genes)
             self.node_genes.append(node_gene)
 
@@ -152,8 +178,12 @@ class NEATGenotype(object):
             potential_conns = (c for c in potential_conns if c not in self.conn_genes)
             # Filter further connections if we're looking only for FF networks
             if self.feedforward:
-                potential_conns = ((f,t) for (f,t) in potential_conns if 
+                potential_conns = ((f, t) for (f, t) in potential_conns if 
                     self.node_genes[f][0] < self.node_genes[t][0]) # Check FFOrder
+            # Don't create inter-layer connections if there is a max_depth
+            if self.max_depth is not None:
+                potential_conns = ((f, t) for (f, t) in potential_conns if 
+                    self.node_genes[f][4] < self.node_genes[t][4]) # Check Layer
             potential_conns = list(potential_conns)
             # If any potential connections are left
             if potential_conns:
@@ -277,12 +307,14 @@ class NEATGenotype(object):
                 cm[to, fr] = weight
         
         # Reorder the nodes/connections
-        ff, node_types, bias, response = zip(*self.node_genes)
+        ff, node_types, bias, response, layer = zip(*self.node_genes)
         order = [i for _,i in sorted(zip(ff, xrange(len(ff))))]
         cm = cm[:,order][order,:]
         node_types = np.array(node_types)[order]
         bias = np.array(bias)[order]
         response = np.array(response)[order]
+        layers = np.array(layer)[order]
+
         # Then, we multiply all the incoming connection weights by the response
         cm *= np.atleast_2d(response).T
         # Finally, add the bias as incoming weights from node-0

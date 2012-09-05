@@ -195,7 +195,7 @@ class NeuralNetwork(object):
             return self.act.reshape(self.original_shape)
 
     
-    def visualize(self, filename, input_nodes=3, output_nodes=1):
+    def visualize(self, filename, inputs=3, outputs=1):
         """ Visualize the network, stores in file. """
         if self.cm.shape[0] > 50:
             return
@@ -205,10 +205,10 @@ class NeuralNetwork(object):
         cm = self.cm.copy()
         # Sandwich network have half input nodes.
         if self.sandwich:
-            input_nodes = cm.shape[0] // 2
-            output_nodes = input_nodes
+            inputs = cm.shape[0] // 2
+            outputs = inputs
         # Clear connections to input nodes, these arent used anyway
-        cm[:input_nodes, :] = 0
+        cm[:inputs, :] = 0
         G = pgv.AGraph(directed=True)
         mw = abs(cm).max()
         for i in range(cm.shape[0]):
@@ -222,13 +222,13 @@ class NeuralNetwork(object):
                 w = cm[i,j]
                 if abs(w) > 0.01:
                     G.add_edge(j, i, penwidth=abs(w)/mw*4, color='blue' if w > 0 else 'red')
-        for n in range(input_nodes):
+        for n in range(inputs):
             pos = (node_dist*n, 0)
             G.get_node(n).attr['pos'] = '%s,%s!' % pos
             G.get_node(n).attr['shape'] = 'doublecircle'
             G.get_node(n).attr['fillcolor'] = 'steelblue'
             G.get_node(n).attr['style'] = 'filled'
-        for i,n in enumerate(range(cm.shape[0] - output_nodes,cm.shape[0])):
+        for i,n in enumerate(range(cm.shape[0] - outputs,cm.shape[0])):
             pos = (node_dist*i, -node_dist * 5)
             G.get_node(n).attr['pos'] = '%s,%s!' % pos
             G.get_node(n).attr['shape'] = 'doublecircle'
