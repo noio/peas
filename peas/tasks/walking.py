@@ -224,7 +224,7 @@ class WalkingTask(object):
         
         distance = torso.position.x
         # print "Travelled %.2f in %d steps." % (distance, step)
-        return distance
+        return {'fitness':distance}
         
     def solve(self, network):
         return False

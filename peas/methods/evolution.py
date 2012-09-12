@@ -9,6 +9,7 @@ import sys
 import random
 from copy import deepcopy
 from itertools import product
+from collections import defaultdict
 
 # Libs
 import numpy as np
@@ -27,12 +28,14 @@ class SimplePopulation(object):
     
     def __init__(self, geno_factory, 
                        popsize = 100, 
+                       elitism = True,
                        stop_when_solved=False, 
                        tournament_selection_k=3,
                        verbose=True):
         # Instance properties
         self.geno_factory           = geno_factory
         self.popsize                = popsize
+        self.elitism                = elitism
         self.stop_when_solved       = stop_when_solved
         self.tournament_selection_k = tournament_selection_k
         self.verbose                = verbose
@@ -47,11 +50,8 @@ class SimplePopulation(object):
         self.champions  = []
         self.generation = 0
         self.solved_at  = None
-        self.stats = {}
-        self.stats['fitness_avg'] = []
-        self.stats['fitness_max'] = []
-        self.stats['solved']      = []        
-        
+        self.stats = defaultdict(list)
+                
     def epoch(self, evaluator, generations, solution=None, reset=True, callback=None):
         """ Runs an evolutionary epoch 
 
@@ -83,9 +83,9 @@ class SimplePopulation(object):
         ## EVALUATE
         for individual in self.population:
             if callable(evaluator):
-                individual.fitness = evaluator(individual)
+                individual.stats = evaluator(individual)
             elif hasattr(evaluator, 'evaluate'):
-                individual.fitness = evaluator.evaluate(individual)
+                individual.stats = evaluator.evaluate(individual)
             else:
                 raise Exception("Evaluator must be a callable or object" \
                                 "with a callable attribute 'evaluate'.")
@@ -94,12 +94,12 @@ class SimplePopulation(object):
                 sys.stdout.flush()
                 
         ## CHAMPION
-        self.champions.append(max(self.population, key=lambda ind: ind.fitness))
+        self.champions.append(max(self.population, key=lambda ind: ind.stats['fitness']))
         
         ## SOLUTION CRITERION
         if solution is not None:
             if isinstance(solution, (int, float)):
-                solved = (self.champions[-1].fitness >= solution)
+                solved = (self.champions[-1].stats['fitness'] >= solution)
             elif callable(solution):
                 solved = solution(self.champions[-1])
             elif hasattr(solution, 'solve'):
@@ -110,25 +110,29 @@ class SimplePopulation(object):
             if solved and self.solved_at is None:
                 self.solved_at = self.generation
         
-        
+        ## REPRODUCE
         newpop = []
-        for _ in xrange(self.popsize):
+
+        if self.elitism:
+            newpop.append(self.champions[-1])
+            
+        while len(newpop) < self.popsize:
             # Perform tournament selection
             k = min(self.tournament_selection_k, len(self.population))
-            winner = max(random.sample(self.population, k), key=lambda ind:ind.fitness)
+            winner = max(random.sample(self.population, k), key=lambda ind:ind.stats['fitness'])
             winner = deepcopy(winner).mutate()
             newpop.append(winner)
         
         self.population = newpop
         
-        ## STATS
-        self.stats['fitness_avg'].append(np.mean([ind.fitness for ind in self.population]))
-        self.stats['fitness_max'].append(self.champions[-1].fitness)
+        for key in self.population[0].stats:
+            self.stats[key+'_avg'].append(np.mean([ind.stats[key] for ind in self.population]))
+            self.stats[key+'_max'].append(np.max([ind.stats[key] for ind in self.population]))
         self.stats['solved'].append( self.solved_at is not None )
         
         if self.verbose:
             print "\n== Generation %d ==" % self.generation
-            print "Best (%.2f): %s" % (self.champions[-1].fitness, self.champions[-1])
+            print "Best (%.2f): %s" % (self.champions[-1].stats['fitness'], self.champions[-1])
             print "Solved: %s" % (self.solved_at)
             
         if callback is not None:

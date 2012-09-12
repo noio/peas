@@ -9,6 +9,7 @@ import sys
 import random
 from copy import deepcopy
 from itertools import product
+from collections import defaultdict
 
 # Libs
 import numpy as np
@@ -408,7 +409,7 @@ class NEATPopulation(object):
             if self.solved_at is not None and self.stop_when_solved:
                 break
                 
-        return {'stats': self.stats, 'champions': self.champions}
+        return {'stats': dict(self.stats), 'champions': self.champions}
 
     def _reset(self):
         """ Resets the state of this population.
@@ -422,10 +423,7 @@ class NEATPopulation(object):
         self.champions    = []
         self.generation   = 0
         self.solved_at    = None
-        self.stats = {}
-        self.stats['fitness_avg'] = []
-        self.stats['fitness_max'] = []
-        self.stats['solved'] = []
+        self.stats = defaultdict(list)
         
     def get_population(self):
         for specie in self.species:
@@ -447,9 +445,9 @@ class NEATPopulation(object):
         ## EVALUATE
         for individual in pop:
             if callable(evaluator):
-                individual.neat_fitness = evaluator(individual)
+                individual.stats = evaluator(individual)
             elif hasattr(evaluator, 'evaluate'):
-                individual.neat_fitness = evaluator.evaluate(individual)
+                individual.stats = evaluator.evaluate(individual)
             else:
                 raise Exception("Evaluator must be a callable or object" \
                                 "with a callable attribute 'evaluate'.")
@@ -486,12 +484,12 @@ class NEATPopulation(object):
             self.current_compatibility_threshold += self.compatibility_threshold_delta
         
         ## CHAMPION
-        self.champions.append(max(pop, key=lambda ind: ind.neat_fitness))
+        self.champions.append(max(pop, key=lambda ind: ind.stats['fitness']))
 
         ## SOLUTION CRITERION
         if solution is not None:
             if isinstance(solution, (int, float)):
-                solved = (self.champions[-1].neat_fitness >= solution)
+                solved = (self.champions[-1].stats['fitness'] >= solution)
             elif callable(solution):
                 solved = solution(self.champions[-1])
             elif hasattr(solution, 'solve'):
@@ -506,8 +504,8 @@ class NEATPopulation(object):
         
         for specie in self.species:
             specie.max_fitness_prev = specie.max_fitness
-            specie.avg_fitness = np.mean([ind.neat_fitness for ind in specie.members])
-            specie.max_fitness = np.max([ind.neat_fitness for ind in specie.members])
+            specie.avg_fitness = np.mean([ind.stats['fitness'] for ind in specie.members])
+            specie.max_fitness = np.max([ind.stats['fitness'] for ind in specie.members])
             if specie.max_fitness <= specie.max_fitness_prev:
                 specie.no_improvement_age += 1
             else:
@@ -545,7 +543,7 @@ class NEATPopulation(object):
             self.innovations = {}
         for specie in self.species:
             # First we keep only the best individuals
-            specie.members.sort(key=lambda ind: ind.neat_fitness, reverse=True)
+            specie.members.sort(key=lambda ind: ind.stats['fitness'], reverse=True)
             keep = max(1, int(round(len(specie.members) * self.survival)))
             parents = specie.members[:keep]
             # Keep one if elitism is set
@@ -554,8 +552,8 @@ class NEATPopulation(object):
             while len(specie.members) < specie.offspring:
                 # Perform tournament selection
                 k = min(len(specie.members), self.tournament_selection_k)
-                p1 = max(random.sample(specie.members, k), key=lambda ind:ind.neat_fitness)
-                p2 = max(random.sample(specie.members, k), key=lambda ind:ind.neat_fitness)
+                p1 = max(random.sample(specie.members, k), key=lambda ind:ind.stats['fitness'])
+                p2 = max(random.sample(specie.members, k), key=lambda ind:ind.stats['fitness'])
                 # Mate and mutate
                 child = p1.mate(p2)
                 child.mutate(innovations=self.innovations, global_innov=self.global_innov)
@@ -565,13 +563,14 @@ class NEATPopulation(object):
             self.global_innov = max(self.innovations.itervalues())
         
         ## STATS
-        self.stats['fitness_avg'].append(np.mean([ind.neat_fitness for ind in pop]))
-        self.stats['fitness_max'].append(self.champions[-1].neat_fitness)
+        for key in pop[0].stats:
+            self.stats[key+'_avg'].append(np.mean([ind.stats[key] for ind in pop]))
+            self.stats[key+'_max'].append(np.max([ind.stats[key] for ind in pop]))
         self.stats['solved'].append( self.solved_at is not None )
         
         if self.verbose:
             print "\n== Generation %d ==" % self.generation
-            print "Best (%.2f): %s" % (self.champions[-1].neat_fitness, self.champions[-1])
+            print "Best (%.2f): %s" % (self.champions[-1].stats['fitness'], self.champions[-1])
             print "Species: %s" % ([len(s.members) for s in self.species])
             print "Solved: %s" % (self.solved_at)
             print "Age: %s" % ([s.age for s in self.species])

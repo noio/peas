@@ -21,6 +21,7 @@ class HyperNEATDeveloper(object):
                  sandwich=False, 
                  weight_range=3.0, 
                  min_weight=0.3,
+                 activation_steps=5,
                  node_type='tanh'):
         """ Constructor 
 
@@ -31,11 +32,12 @@ class HyperNEATDeveloper(object):
             :param sandwich:       Whether to turn the output net into a sandwich network.
             :param node_type:      What node type to assign to the output nodes.
         """
-        self.substrate    = substrate
-        self.sandwich     = sandwich
-        self.weight_range = weight_range
-        self.min_weight   = min_weight
-        self.node_type    = node_type
+        self.substrate        = substrate
+        self.sandwich         = sandwich
+        self.weight_range     = weight_range
+        self.min_weight       = min_weight
+        self.activation_steps = activation_steps
+        self.node_type        = node_type
         
         if substrate_shape is not None:
             self.substrate = list(product(*[np.linspace(-1.0, 1.0, s) for s in substrate_shape]))
@@ -58,13 +60,16 @@ class HyperNEATDeveloper(object):
         # I assume this means it's a feedforward net, since otherwise
         # there is no clear definition of "full activation".
         # In an FF network, activating each node once leads to a stable condition. 
-        network.make_feedforward()
         
         # Initialize connectivity matrix  
         cm = np.zeros((len(self.substrate), len(self.substrate)))
             
         for (i, fr), (j, to) in product(enumerate(self.substrate), repeat=2):
-            weight = network.feed(fr + to)[-1]
+            if network.feedforward:
+                weight = network.feed(fr + to)[-1]
+            else:
+                for _ in xrange(self.activation_steps):
+                    weight = network.feed(fr + to)[-1]
             cm[j, i] = weight
             
         cm[np.abs(cm) < self.min_weight] = 0
