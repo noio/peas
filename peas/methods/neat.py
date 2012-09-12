@@ -16,6 +16,7 @@ import numpy as np
 np.seterr(over='warn', divide='raise')
 
 # Package
+from .evolution import SimplePopulation
 
 # Shortcuts
 rand = random.random
@@ -347,7 +348,7 @@ class NEATSpecies(object):
         self.has_best           = False
                 
         
-class NEATPopulation(object):
+class NEATPopulation(SimplePopulation):
     """ A population object for NEAT, it contains the selection
         and reproduction methods.
     """
@@ -393,68 +394,43 @@ class NEATPopulation(object):
         self.stop_when_solved              = stop_when_solved
         self.verbose                       = verbose
         
-    def epoch(self, evaluator, generations, solution=None, reset=True, callback=None):
-        """ Runs an evolutionary epoch 
-
-            :param evaluator:    Either a function or an object with a function
-                                 named 'evaluate' that returns a given individual's
-                                 fitness.
-            :param callback:     Function that is called at the end of each generation.
-        """
-        if reset:
-            self._reset()
-        
-        for _ in xrange(generations):
-            self._evolve(evaluator, solution, callback)
-            if self.solved_at is not None and self.stop_when_solved:
-                break
-                
-        return {'stats': dict(self.stats), 'champions': self.champions}
 
     def _reset(self):
         """ Resets the state of this population.
         """
+        # Keep track of some history
+        self.champions  = []
+        self.generation = 0
+        self.solved_at  = None
+        self.stats = defaultdict(list)
+        
+        # Neat specific:
         self.species      = [] # List of species
         self.global_innov = 0
         self.innovations = {} # Keep track of global innovations
         self.current_compatibility_threshold = self.compatibility_threshold
                 
-        # Keep track of some history
-        self.champions    = []
-        self.generation   = 0
-        self.solved_at    = None
-        self.stats = defaultdict(list)
-        
-    def get_population(self):
+    @property
+    def population(self):
         for specie in self.species:
             for member in specie.members:
                 yield member
         
-    def _evolve(self, evaluator, solution=None, callback=None):
+    def _evolve(self, evaluator, solution=None):
         """ A single evolutionary step .
         """
         # Unpack species
-        pop = list(self.get_population())
+        pop = list(self.population)
         
         ## INITIAL BIRTH
         while len(pop) < self.popsize:
             individual = self.geno_factory()
             individual.neat_species = 0
             pop.append(individual)
-        
+            
         ## EVALUATE
-        for individual in pop:
-            if callable(evaluator):
-                individual.stats = evaluator(individual)
-            elif hasattr(evaluator, 'evaluate'):
-                individual.stats = evaluator.evaluate(individual)
-            else:
-                raise Exception("Evaluator must be a callable or object" \
-                                "with a callable attribute 'evaluate'.")
-            if self.verbose:
-                sys.stdout.write('#')
-                sys.stdout.flush()
-        
+        self._evaluate_all(pop, evaluator)
+                
         ## SPECIATE
         # Select random representatives
         for specie in self.species:
@@ -483,22 +459,8 @@ class NEATPopulation(object):
         elif len(self.species) > self.target_species:
             self.current_compatibility_threshold += self.compatibility_threshold_delta
         
-        ## CHAMPION
-        self.champions.append(max(pop, key=lambda ind: ind.stats['fitness']))
-
-        ## SOLUTION CRITERION
-        if solution is not None:
-            if isinstance(solution, (int, float)):
-                solved = (self.champions[-1].stats['fitness'] >= solution)
-            elif callable(solution):
-                solved = solution(self.champions[-1])
-            elif hasattr(solution, 'solve'):
-                solved = solution.solve(self.champions[-1])
-            else:
-                raise Exception("Solution checker must be a threshold fitness value,"\
-                                "a callable, or an object with a method 'solve'.")
-            if solved and self.solved_at is None:
-                self.solved_at = self.generation
+        ## FIND CHAMPION / CHECK FOR SOLUTION
+        self._find_best(pop)
 
         ## REPRODUCE
         
@@ -560,24 +522,16 @@ class NEATPopulation(object):
                 specie.members.append( child )
         
         if self.innovations:
-            self.global_innov = max(self.innovations.itervalues())
-        
-        ## STATS
-        for key in pop[0].stats:
-            self.stats[key+'_avg'].append(np.mean([ind.stats[key] for ind in pop]))
-            self.stats[key+'_max'].append(np.max([ind.stats[key] for ind in pop]))
-        self.stats['solved'].append( self.solved_at is not None )
-        
-        if self.verbose:
-            print "\n== Generation %d ==" % self.generation
-            print "Best (%.2f): %s" % (self.champions[-1].stats['fitness'], self.champions[-1])
-            print "Species: %s" % ([len(s.members) for s in self.species])
-            print "Solved: %s" % (self.solved_at)
-            print "Age: %s" % ([s.age for s in self.species])
-            print "No improvement: %s" % ([s.no_improvement_age for s in self.species])
+            self.global_innov = max(self.innovations.itervalues())            
             
-        if callback is not None:
-            callback(self)
+        self._gather_stats(pop)
         
-        self.generation += 1 
+    def _status_report(self):
+        """ Print a status report """
+        """ Prints a status report """
+        print "\n== Generation %d ==" % self.generation
+        print "Best (%.2f): %s" % (self.champions[-1].stats['fitness'], self.champions[-1])
+        print "Solved: %s" % (self.solved_at)
+        print "Age: %s" % ([s.age for s in self.species])
+        print "No improvement: %s" % ([s.no_improvement_age for s in self.species])
         

@@ -39,7 +39,6 @@ class SimplePopulation(object):
         self.stop_when_solved       = stop_when_solved
         self.tournament_selection_k = tournament_selection_k
         self.verbose                = verbose
-
         
     def _reset(self):
         """ Resets the state of this population.
@@ -64,14 +63,23 @@ class SimplePopulation(object):
             self._reset()
         
         for _ in xrange(generations):
-            self._evolve(evaluator, solution, callback)
+            self._evolve(evaluator, solution)
+
+            self.generation += 1
+
+            if self.verbose:
+                self._status_report()
+            
+            if callback is not None:
+                callback(self)
+                
             if self.solved_at is not None and self.stop_when_solved:
                 break
                 
         return {'stats': self.stats, 'champions': self.champions}
         
     
-    def _evolve(self, evaluator, solution=None , callback=None):
+    def _evolve(self, evaluator, solution=None):
         """ Runs a single step of evolution.
         """
         
@@ -80,15 +88,8 @@ class SimplePopulation(object):
         self._find_best(pop, solution) 
         pop = self._reproduce(pop)        
         self._gather_stats(pop)
-        
-        if self.verbose:
-            self._status_report(pop)
-            
-        if callback is not None:
-            callback(self)
-        
+                            
         self.population = pop
-        self.generation += 1
 
     def _birth(self):
         """ Creates a population if there is none, returns
@@ -162,7 +163,7 @@ class SimplePopulation(object):
             self.stats[key+'_max'].append(np.max([ind.stats[key] for ind in pop]))
         self.stats['solved'].append( self.solved_at is not None )
         
-    def _status_report(self, pop):
+    def _status_report(self):
         """ Prints a status report """
         print "\n== Generation %d ==" % self.generation
         print "Best (%.2f): %s" % (self.champions[-1].stats['fitness'], self.champions[-1])
