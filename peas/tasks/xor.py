@@ -48,7 +48,8 @@ class XORTask(object):
                 print "%r -> %r (%.2f)" % (i, output, err)
             rmse += err 
 
-        return 1/(1+np.sqrt(rmse / len(pairs)))
+        score = 1/(1+np.sqrt(rmse / len(pairs)))
+        return {'fitness': score}
         
     def solve(self, network):
         return int(self.evaluate(network) > 0.9)

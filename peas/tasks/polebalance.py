@@ -139,11 +139,13 @@ class PoleBalanceTask(object):
                                     (x, dx, t, dt) in states[-100:])
                 wiggle = max(wiggle, 0.01) # Cap the wiggle bonus
                 f2 = 0.75 / wiggle
-            return 0.1 * f1 + 0.9 * f2
+            score = 0.1 * f1 + 0.9 * f2
         else:
             """ This is just number of steps without falling.
             """
-            return steps/float(self.max_steps)
+            score = steps/float(self.max_steps)
+            
+        return {'fitness': score, 'steps': steps}
 
     def solve(self, network):
         """ This function should measure whether the network passes some

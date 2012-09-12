@@ -71,7 +71,8 @@ class VisualFieldTask(object):
                 y_ = 0
             dist += ((x-x_)**2 + (y-y_)**2)**0.5
         dist = dist / self.trials
-        return 1. / (1. + dist)
+        score = 1. / (1. + dist)
+        return {'fitness': score}
         
     def solve(self, network):
         return self.do(network) > 0.99
