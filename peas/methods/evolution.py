@@ -69,19 +69,42 @@ class SimplePopulation(object):
                 break
                 
         return {'stats': self.stats, 'champions': self.champions}
-
-
+        
+    
     def _evolve(self, evaluator, solution=None , callback=None):
+        """ Runs a single step of evolution.
+        """
+        
+        pop = self._birth()
+        self._evaluate_all(pop, evaluator)
+        self._find_best(pop, solution) 
+        pop = self._reproduce(pop)        
+        self._gather_stats(pop)
+        
+        if self.verbose:
+            self._status_report(pop)
+            
+        if callback is not None:
+            callback(self)
+        
+        self.population = pop
+        self.generation += 1
 
-        ## INITIAL BIRTH
+    def _birth(self):
+        """ Creates a population if there is none, returns
+            current population otherwise.
+        """
         while len(self.population) < self.popsize:
             individual = self.geno_factory()
-            individual.neat_species = 0
             self.population.append(individual)
-
-
-        ## EVALUATE
-        for individual in self.population:
+        
+        return self.population
+        
+    def _evaluate_all(self, pop, evaluator):
+        """ Evaluates all of the individuals in given pop,
+            and assigns their "stats" property.
+        """
+        for individual in pop:
             if callable(evaluator):
                 individual.stats = evaluator(individual)
             elif hasattr(evaluator, 'evaluate'):
@@ -92,9 +115,13 @@ class SimplePopulation(object):
             if self.verbose:
                 sys.stdout.write('#')
                 sys.stdout.flush()
-                
+    
+    def _find_best(self, pop, solution=None):
+        """ Finds the best individual, and adds it to the champions, also 
+            checks if this best individual 'solves' the problem.
+        """
         ## CHAMPION
-        self.champions.append(max(self.population, key=lambda ind: ind.stats['fitness']))
+        self.champions.append(max(pop, key=lambda ind: ind.stats['fitness']))
         
         ## SOLUTION CRITERION
         if solution is not None:
@@ -109,8 +136,10 @@ class SimplePopulation(object):
                                 "a callable, or an object with a method 'solve'.")
             if solved and self.solved_at is None:
                 self.solved_at = self.generation
-        
-        ## REPRODUCE
+                
+    def _reproduce(self, pop):
+        """ Reproduces (and mutates) the best individuals to create a new population.
+        """
         newpop = []
 
         if self.elitism:
@@ -118,24 +147,24 @@ class SimplePopulation(object):
             
         while len(newpop) < self.popsize:
             # Perform tournament selection
-            k = min(self.tournament_selection_k, len(self.population))
-            winner = max(random.sample(self.population, k), key=lambda ind:ind.stats['fitness'])
+            k = min(self.tournament_selection_k, len(pop))
+            winner = max(random.sample(pop, k), key=lambda ind:ind.stats['fitness'])
             winner = deepcopy(winner).mutate()
             newpop.append(winner)
+            
+        return newpop
         
-        self.population = newpop
-        
-        for key in self.population[0].stats:
-            self.stats[key+'_avg'].append(np.mean([ind.stats[key] for ind in self.population]))
-            self.stats[key+'_max'].append(np.max([ind.stats[key] for ind in self.population]))
+    def _gather_stats(self, pop):
+        """ Collects avg and max of individuals' stats (incl. fitness).
+        """
+        for key in pop[0].stats:
+            self.stats[key+'_avg'].append(np.mean([ind.stats[key] for ind in pop]))
+            self.stats[key+'_max'].append(np.max([ind.stats[key] for ind in pop]))
         self.stats['solved'].append( self.solved_at is not None )
         
-        if self.verbose:
-            print "\n== Generation %d ==" % self.generation
-            print "Best (%.2f): %s" % (self.champions[-1].stats['fitness'], self.champions[-1])
-            print "Solved: %s" % (self.solved_at)
-            
-        if callback is not None:
-            callback(self)
+    def _status_report(self, pop):
+        """ Prints a status report """
+        print "\n== Generation %d ==" % self.generation
+        print "Best (%.2f): %s" % (self.champions[-1].stats['fitness'], self.champions[-1])
+        print "Solved: %s" % (self.solved_at)
         
-        self.generation += 1
