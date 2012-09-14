@@ -84,7 +84,7 @@ class PoleBalanceTask(object):
         
         return (x, dx, theta, dtheta)
 
-    def _loop(self, network, max_steps=1000, initial=None, verbose=False):
+    def _loop(self, network, max_steps, initial=None, verbose=False):
         if initial is None:
             x, dx  = 0.0, 0.0
             if self.start_random:
@@ -119,6 +119,7 @@ class PoleBalanceTask(object):
     def evaluate(self, network, verbose=False):
         """ Perform a single run of this task """
         # Convert to a network if it is not.
+
         if not isinstance(network, NeuralNetwork):
             network = NeuralNetwork(network)
         
