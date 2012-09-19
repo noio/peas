@@ -9,6 +9,9 @@ import math
 import numpy as np
 from PIL import Image
 
+# Local
+from ..networks.rnn import NeuralNetwork
+
 ### CLASSES ###
 
 class ImageTask(object):
@@ -30,6 +33,9 @@ class ImageTask(object):
         self.target /= self.target.max()
                 
     def evaluate(self, network):
+        if not isinstance(network, NeuralNetwork):
+            network = NeuralNetwork(network)
+        
         if network.cm.shape != self.target.shape:
             raise Exception("Network shape (%s) does not match target shape (%s)." % 
                 (network.cm.shape, self.target.shape))
@@ -44,12 +50,10 @@ class ImageTask(object):
         import matplotlib
         matplotlib.use('Agg',warn=False)
         import matplotlib.pyplot as plt
-        if network.cm.shape > self.target.shape:
-            cm = network.cm[:self.target.shape[0],:self.target.shape[1]]
-        else:
-            cm = network.cm
-        plt.imsave(filename, np.hstack((cm, self.target)), cmap=plt.cm.RdBu)
-
+        cm = network.cm
+        target = self.target
+        error = (cm - target) ** 2
+        plt.imsave(filename, np.hstack((network.cm, self.target, error)), cmap=plt.cm.RdBu)
 
         
 if __name__ == '__main__':

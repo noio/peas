@@ -134,7 +134,10 @@ class NeuralNetwork(object):
             elif isinstance(source, neat.chromosome.Chromosome):
                 self.from_neatchromosome(source)
             else:
-                raise Exception("Cannot convert from %s to %s" % (source.__class__, self.__class__))
+                try:
+                    self.from_matrix(*source.get_network_data())
+                except AttributeError:
+                    raise Exception("Cannot convert from %s to %s" % (source.__class__, self.__class__))
 
     def make_sandwich(self):
         """ Turns the network into a sandwich network,
