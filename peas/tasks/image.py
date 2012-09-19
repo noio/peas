@@ -13,12 +13,21 @@ from PIL import Image
 
 class ImageTask(object):
     
-    def __init__(self, size=10, shape='pyramid'):
+    def __init__(self, size=10, shape=['pyramid', 'waves_nw']):
         X, Y = np.meshgrid(np.linspace(-1, 1, size), np.linspace(-1, 1, size))
         w = 0.4
         # self.target = ((-w < X) & (X < w) | (-w < Y) & (Y < w)) * 2.0 - 1.0
-        if shape == 'pyramid':
-            self.target = abs(X) + abs(Y) - 1.0
+        self.target = np.zeros((size, size))
+        if 'pyramid' in shape:
+            self.target += abs(X) + abs(Y) - 1.0
+        if 'waves_nw' in shape:
+            waves = np.sin(5*(X + Y))
+            waves[size/2:,:] = 0
+            waves[:,size/2:] = 0
+            self.target += waves
+        # Normalize
+        self.target -= self.target.min()
+        self.target /= self.target.max()
                 
     def evaluate(self, network):
         if network.cm.shape != self.target.shape:
