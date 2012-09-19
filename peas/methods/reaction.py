@@ -17,6 +17,11 @@ np.seterr(divide='raise')
 
 ### CLASSES ###
 
+class ReactionDiffusionGenotype(object):
+    
+    def __init__(self, num_chemicals=3):
+        pass
+
 class ReactionDeveloper(object):
     """ Developer that converts a genotype into 
         a network using a HyperNEAT-like indirect

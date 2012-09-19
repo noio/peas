@@ -30,7 +30,7 @@ def gauss(x, mean=0.0, std=1.0):
     """ Returns the pdf of a gaussian.
     """
     z = (x - mean) / std
-    return np.exp(-z**2/2.0) / np.sqrt(2*np.pi) / std
+    return np.exp(-z**2 / 2.0) / np.sqrt(2*np.pi) / std
     
 def sigmoid(x):
     """ Sigmoid function. 
@@ -42,6 +42,7 @@ def sigmoid(x):
     
 
 ### CONSTANTS ###
+
 
 ACTIVATION_FUNCS = {
     'sin': np.sin,
@@ -117,7 +118,7 @@ class NeuralNetwork(object):
         self.act = np.zeros(self.cm.shape[0])
         return self
     
-    def __init__(self, source=None):
+    def __init__(self, source=None, max_activation=100.0):
         # Set instance vars
         self.feedforward    = False
         self.sandwich       = False   
@@ -125,6 +126,7 @@ class NeuralNetwork(object):
         self.node_types     = None
         self.single_type    = None
         self.original_shape = None
+        self.max_activation = max_activation
         
         if source is not None:
             if isinstance(source, NEATGenotype):
@@ -188,6 +190,7 @@ class NeuralNetwork(object):
             for i in range(len(self.node_types)):
                 self.act[i] = self.node_types[i](self.act[i])
             
+        self.act = np.clip(self.act, -self.max_activation, self.max_activation)
         # Reshape the output to 2D if it was 2D
         if self.sandwich:
             return self.act[self.act.size//2:].reshape(self.original_shape)      

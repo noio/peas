@@ -66,12 +66,12 @@ class HyperNEATDeveloper(object):
             
         for (i, fr), (j, to) in product(enumerate(self.substrate), repeat=2):
             if network.feedforward:
-                weight = network.feed(fr + to)[-1]
+                weight = network.feed(np.hstack((fr, to)))[-1]
             else:
                 for _ in xrange(self.activation_steps):
-                    weight = network.feed(fr + to)[-1]
+                    weight = network.feed(np.hstack((fr, to)))[-1]
             cm[j, i] = weight
-            
+        
         cm[np.abs(cm) < self.min_weight] = 0
         cm -= (np.sign(cm) * self.min_weight)
         cm *= self.weight_range / (self.weight_range - self.min_weight)
@@ -81,6 +81,10 @@ class HyperNEATDeveloper(object):
         
         if self.sandwich:
             net.make_sandwich()
+            
+        if not np.all(np.isfinite(net.cm)):
+            network.visualize("invalid.png")
+            raise Exception("Network contains NaN/inf weights.")
             
         return net
             
