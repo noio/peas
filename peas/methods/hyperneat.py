@@ -38,9 +38,15 @@ class HyperNEATDeveloper(object):
         self.min_weight       = min_weight
         self.activation_steps = activation_steps
         self.node_type        = node_type
+        self.substrate_shape  = substrate_shape
         
         if substrate_shape is not None:
-            self.substrate = list(product(*[np.linspace(-1.0, 1.0, s) for s in substrate_shape]))
+            # Create coordinate grids
+            self.substrate = np.mgrid[[slice(-1, 1, s*1j) for s in substrate_shape]]
+            # Move coordinates to last dimension
+            self.substrate = self.substrate.transpose(range(1,len(substrate_shape)+1) + [0])
+            # Reshape to a N x nD list.
+            self.substrate = self.substrate.reshape(-1, len(substrate_shape))
                                           
         if self.substrate is None:
             raise Exception("You must pass either substrate or substrate_shape")
@@ -61,7 +67,14 @@ class HyperNEATDeveloper(object):
         # there is no clear definition of "full activation".
         # In an FF network, activating each node once leads to a stable condition. 
         
-        # Initialize connectivity matrix  
+        # Check if the network has enough inputs.
+        cm_dims = 2 * len(self.substrate_shape)
+        required_inputs = cm_dims + 1
+        if network.cm.shape[0] < required_inputs:
+            raise Exception("Network does not have enough inputs. Has %d, needs %d" %
+                    (network.cm.shape[0], cm_dims+1))
+
+        # Initialize connectivity matrix
         cm = np.zeros((len(self.substrate), len(self.substrate)))
             
         for (i, fr), (j, to) in product(enumerate(self.substrate), repeat=2):
@@ -72,10 +85,12 @@ class HyperNEATDeveloper(object):
                     weight = network.feed(np.hstack((fr, to)))[-1]
             cm[j, i] = weight
         
+        # Rescale the CM
         cm[np.abs(cm) < self.min_weight] = 0
         cm -= (np.sign(cm) * self.min_weight)
         cm *= self.weight_range / (self.weight_range - self.min_weight)
-            
+        
+        # Clip highest weights
         cm = np.clip(cm, -self.weight_range, self.weight_range)
         net = NeuralNetwork().from_matrix(cm, node_types=[self.node_type])
         
@@ -83,7 +98,6 @@ class HyperNEATDeveloper(object):
             net.make_sandwich()
             
         if not np.all(np.isfinite(net.cm)):
-            network.visualize("invalid.png")
             raise Exception("Network contains NaN/inf weights.")
             
         return net

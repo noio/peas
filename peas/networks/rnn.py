@@ -177,7 +177,7 @@ class NeuralNetwork(object):
         if self.feedforward:
             self.act = np.zeros(self.cm.shape[0])
             self.act[:input_size] = input_activation.flat[:input_size]
-            for i in range(input_size, self.act.size):
+            for i in xrange(input_size, self.act.size):
                 self.act[i] = self.node_types[i](np.dot(self.cm[i], self.act))
         # Sandwich networks activate once globally, and need a single activation
         # type.
@@ -190,7 +190,7 @@ class NeuralNetwork(object):
         else:
             self.act[:input_size] = input_activation.flat[:input_size]
             self.act = np.dot(self.cm, self.act)
-            for i in range(len(self.node_types)):
+            for i in xrange(len(self.node_types)):
                 self.act[i] = self.node_types[i](self.act[i])
             
         self.act = np.clip(self.act, -self.max_activation, self.max_activation)

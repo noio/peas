@@ -7,6 +7,7 @@ import math
 
 # Libraries
 import numpy as np
+import scipy.misc
 from PIL import Image
 
 # Local
@@ -14,24 +15,28 @@ from ..networks.rnn import NeuralNetwork
 
 ### CLASSES ###
 
-class ImageTask(object):
+class TargetWeightsTask(object):
     
-    def __init__(self, size=10, shape=['pyramid', 'waves_nw']):
-        X, Y = np.meshgrid(np.linspace(-1, 1, size), np.linspace(-1, 1, size))
-        w = 0.4
-        # self.target = ((-w < X) & (X < w) | (-w < Y) & (Y < w)) * 2.0 - 1.0
-        self.target = np.zeros((size, size))
-        if 'pyramid' in shape:
-            self.target += abs(X) + abs(Y) - 1.0
-        if 'waves_nw' in shape:
-            waves = np.sin(5*(X + Y))
-            waves[size/2:,:] = 0
-            waves[:,size/2:] = 0
-            self.target += waves
-        # Normalize
-        self.target -= self.target.min()
-        self.target /= self.target.max()
-                
+    def __init__(self, substrate_shape=(3,3), noise=0.1, 
+                funcs=[(lambda c: c[0] < 0.5, lambda c: np.sin(c[1]*3))] 
+                ):
+        # Instance vars
+        self.substrate_shape = substrate_shape
+        # Build the connectivity matrix coords system
+        cm_shape = list(substrate_shape) + list(substrate_shape)
+        coords = np.mgrid[[slice(-1, 1, s*1j) for s in cm_shape]]
+        cm = np.zeros(cm_shape)
+        # Add weights
+        for (where, what) in funcs:
+            mask = where(coords)
+            vals = what(coords)
+            cm[mask] += vals[mask]
+            
+        # Add noise
+        mask = np.random.random(cm.shape) < noise
+        cm[mask] = np.random.random(cm.shape)[mask]
+        self.target = cm.reshape(np.product(substrate_shape), np.product(substrate_shape))
+                        
     def evaluate(self, network):
         if not isinstance(network, NeuralNetwork):
             network = NeuralNetwork(network)
@@ -39,7 +44,7 @@ class ImageTask(object):
         if network.cm.shape != self.target.shape:
             raise Exception("Network shape (%s) does not match target shape (%s)." % 
                 (network.cm.shape, self.target.shape))
-        err = ((network.cm - self.target)**2).mean()
+        err = ((network.cm - self.target)**2).sum()
         score = 1 / (1 + err)
         return {'fitness': score}
         
@@ -57,5 +62,5 @@ class ImageTask(object):
 
         
 if __name__ == '__main__':
-    task = ImageTask()
+    task = TargetWeightsTask()
     print task.target
