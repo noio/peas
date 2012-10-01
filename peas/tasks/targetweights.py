@@ -17,15 +17,17 @@ from ..networks.rnn import NeuralNetwork
 
 class TargetWeightsTask(object):
     
-    def __init__(self, substrate_shape=(3,3), noise=0.1, 
-                funcs=[(lambda c: c[0] < 0.5, lambda c: np.sin(c[1]*3))] 
+    def __init__(self, substrate_shape=(3,3), noise=0.1, max_weight=3.0,
+                funcs=[] 
                 ):
         # Instance vars
         self.substrate_shape = substrate_shape
+        self.max_weight      = max_weight
         # Build the connectivity matrix coords system
         cm_shape = list(substrate_shape) + list(substrate_shape)
         coords = np.mgrid[[slice(-1, 1, s*1j) for s in cm_shape]]
-        cm = np.zeros(cm_shape)
+        Q = np.random.random() * max_weight * 2 - max_weight
+        cm = np.ones(cm_shape) * Q
         # Add weights
         for (where, what) in funcs:
             mask = where(coords)
@@ -44,9 +46,9 @@ class TargetWeightsTask(object):
         if network.cm.shape != self.target.shape:
             raise Exception("Network shape (%s) does not match target shape (%s)." % 
                 (network.cm.shape, self.target.shape))
-        err = ((network.cm - self.target)**2).sum()
-        score = 1 / (1 + err)
-        return {'fitness': score}
+        err = np.abs(network.cm - self.target)
+        score = ((2 * self.max_weight) - err).mean()
+        return {'fitness': 2**score, 'error':err.mean()}
         
     def solve(self, network):
         return self.do(network) > 0.9
