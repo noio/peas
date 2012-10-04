@@ -26,6 +26,9 @@ inf  = float('inf')
 def linear(x, clip=(-1.0, 1.0)):
     return np.clip(x, *clip)
 
+def linear3(x, clip=(-3.0, 3.0)):
+    return np.clip(x, *clip)
+
 def gauss(x, mean=0.0, std=1.0):
     """ Returns the pdf of a gaussian.
     """
@@ -48,6 +51,7 @@ ACTIVATION_FUNCS = {
     'sin': np.sin,
     'abs': np.abs,
     'linear': linear,
+    'linear3': linear3,
     'gauss': gauss,
     'sigmoid': sigmoid,
     'exp': sigmoid,
@@ -155,6 +159,11 @@ class NeuralNetwork(object):
         self.feedforward = True
         self.cm[np.triu_indices(self.cm.shape[0])] = 0
         return self
+        
+    def flush(self):
+        """ Reset activation values. """
+        self.act = np.zeros(self.cm.shape[0])
+        
         
     def feed(self, input_activation, add_bias=True):
         """ Feed an input to the network, returns the entire

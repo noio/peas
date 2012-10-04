@@ -7,6 +7,7 @@
 ### IMPORTS ###
 import sys
 import random
+import multiprocessing
 from copy import deepcopy
 from itertools import product
 from collections import defaultdict
@@ -21,6 +22,18 @@ np.seterr(over='warn', divide='raise')
 rand = random.random
 inf  = float('inf')
 
+### FUNCTIONS ###
+
+def evaluate_individual((individual, evaluator)):
+    if callable(evaluator):
+        individual.stats = evaluator(individual)
+    elif hasattr(evaluator, 'evaluate'):
+        individual.stats = evaluator.evaluate(individual)
+    else:
+        raise Exception("Evaluator must be a callable or object" \
+                        "with a callable attribute 'evaluate'.")
+    return individual
+
 
 ### CLASSES ###
                 
@@ -31,7 +44,8 @@ class SimplePopulation(object):
                        elitism = True,
                        stop_when_solved=False, 
                        tournament_selection_k=3,
-                       verbose=True):
+                       verbose=True,
+                       parallel=True):
         # Instance properties
         self.geno_factory           = geno_factory
         self.popsize                = popsize
@@ -39,6 +53,7 @@ class SimplePopulation(object):
         self.stop_when_solved       = stop_when_solved
         self.tournament_selection_k = tournament_selection_k
         self.verbose                = verbose
+        self.parallel               = parallel
         
     def _reset(self):
         """ Resets the state of this population.
@@ -84,7 +99,7 @@ class SimplePopulation(object):
         """
         
         pop = self._birth()
-        self._evaluate_all(pop, evaluator)
+        pop = self._evaluate_all(pop, evaluator)
         self._find_best(pop, solution) 
         pop = self._reproduce(pop)        
         self._gather_stats(pop)
@@ -105,17 +120,17 @@ class SimplePopulation(object):
         """ Evaluates all of the individuals in given pop,
             and assigns their "stats" property.
         """
-        for individual in pop:
-            if callable(evaluator):
-                individual.stats = evaluator(individual)
-            elif hasattr(evaluator, 'evaluate'):
-                individual.stats = evaluator.evaluate(individual)
-            else:
-                raise Exception("Evaluator must be a callable or object" \
-                                "with a callable attribute 'evaluate'.")
-            if self.verbose:
-                sys.stdout.write('#')
-                sys.stdout.flush()
+        cpus = multiprocessing.cpu_count()
+        if cpus > 1 and self.parallel:
+            if not hasattr(self, 'pool') or self.pool is None:
+                print "Running on %d CPUs" % (cpus - 1)
+                self.pool = multiprocessing.Pool(cpus - 1)
+            m = self.pool.map
+        else:
+            m = map
+        pop = m(evaluate_individual, ((individual, evaluator) for individual in pop))
+        
+        return pop
     
     def _find_best(self, pop, solution=None):
         """ Finds the best individual, and adds it to the champions, also 

@@ -81,6 +81,7 @@ class HyperNEATDeveloper(object):
             if network.feedforward:
                 weight = network.feed(np.hstack((fr, to)))[-1]
             else:
+                network.flush()
                 for _ in xrange(self.activation_steps):
                     weight = network.feed(np.hstack((fr, to)))[-1]
             cm[j, i] = weight

@@ -35,14 +35,14 @@ class NEATGenotype(object):
                  outputs=1, 
                  types=['tanh'],
                  topology=None,
-                 feedforward=False,
+                 feedforward=True,
                  max_depth=None,
                  response_default=4.924273,
                  initial_weight_stdev=2.0,
                  bias_as_node=False,
                  prob_add_node=0.03,
-                 prob_add_conn=0.05,
-                 prob_mutate_weight=0.9,
+                 prob_add_conn=0.3,
+                 prob_mutate_weight=0.8,
                  prob_reenable_conn=0.01,
                  prob_mutate_bias=0.2,
                  prob_mutate_response=0.2,
@@ -369,7 +369,8 @@ class NEATPopulation(SimplePopulation):
                  old_multiplier=0.2,
                  stagnation_age=15,
                  stop_when_solved=False,
-                 verbose=True):
+                 verbose=True,
+                 parallel=True):
         """ Initializes the object with settings,
             does not create a population yet.
             
@@ -393,6 +394,7 @@ class NEATPopulation(SimplePopulation):
         self.stagnation_age                = stagnation_age
         self.stop_when_solved              = stop_when_solved
         self.verbose                       = verbose
+        self.parallel                      = parallel
         
 
     def _reset(self):
@@ -429,7 +431,7 @@ class NEATPopulation(SimplePopulation):
             pop.append(individual)
             
         ## EVALUATE
-        self._evaluate_all(pop, evaluator)
+        pop = self._evaluate_all(pop, evaluator)
                 
         ## SPECIATE
         # Select random representatives

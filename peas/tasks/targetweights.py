@@ -17,7 +17,7 @@ from ..networks.rnn import NeuralNetwork
 
 class TargetWeightsTask(object):
     
-    def __init__(self, substrate_shape=(3,3), noise=0.1, max_weight=3.0,
+    def __init__(self, default_weight=0, substrate_shape=(3,3), noise=0.1, max_weight=3.0,
                 funcs=[] 
                 ):
         # Instance vars
@@ -26,8 +26,7 @@ class TargetWeightsTask(object):
         # Build the connectivity matrix coords system
         cm_shape = list(substrate_shape) + list(substrate_shape)
         coords = np.mgrid[[slice(-1, 1, s*1j) for s in cm_shape]]
-        Q = np.random.random() * max_weight * 2 - max_weight
-        cm = np.ones(cm_shape) * Q
+        cm = np.ones(cm_shape) * default_weight
         # Add weights
         for (where, what) in funcs:
             mask = where(coords)
@@ -36,7 +35,8 @@ class TargetWeightsTask(object):
             
         # Add noise
         mask = np.random.random(cm.shape) < noise
-        cm[mask] = np.random.random(cm.shape)[mask]
+        random_weights = np.random.random(cm.shape) * max_weight * 2 - max_weight
+        cm[mask] = random_weights[mask]
         self.target = cm.reshape(np.product(substrate_shape), np.product(substrate_shape))
                         
     def evaluate(self, network):
