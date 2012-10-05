@@ -141,7 +141,7 @@ class NEATGenotype(object):
             # If there is a max depth, we can only split connections that skip a layer.
             # E.g. we can split a connection from layer 0 to layer 2, because the resulting
             # node would be in layer 1. We cannot split a connection from layer 1 to layer 2,
-            # because that would create an inter-layer connection.
+            # because that would create an intra-layer connection.
             if self.max_depth is not None:
                 possible_to_split = [(fr, to) for (fr, to) in possible_to_split if
                                         self.node_genes[fr][4] + 1 < self.node_genes[to][4]]
@@ -182,7 +182,7 @@ class NEATGenotype(object):
             if self.feedforward:
                 potential_conns = ((f, t) for (f, t) in potential_conns if 
                     self.node_genes[f][0] < self.node_genes[t][0]) # Check FFOrder
-            # Don't create inter-layer connections if there is a max_depth
+            # Don't create intra-layer connections if there is a max_depth
             if self.max_depth is not None:
                 potential_conns = ((f, t) for (f, t) in potential_conns if 
                     self.node_genes[f][4] < self.node_genes[t][4]) # Check Layer
@@ -259,6 +259,13 @@ class NEATGenotype(object):
                     cg = other_conns[i]
             if cg is not None:
                 child.conn_genes[(cg[1], cg[2])] = deepcopy(cg)
+
+        # Filter out connections that would become recursive in the new individual.
+        def is_feedforward(((fr, to), cg)):
+            return child.node_genes[fr][0] < child.node_genes[to][0]
+
+        if self.feedforward:
+            child.conn_genes = dict(filter(is_feedforward, child.conn_genes.items()))
         
         return child
         
@@ -286,6 +293,8 @@ class NEATGenotype(object):
                     d += 1 # Disjoint                
                 else:
                     e += 1 # Excess                    
+            else:
+                raise Exception("NEITHERHWATHWATHAWTHA")
         
         w = (w / m) if m > 0 else w
         
@@ -325,7 +334,15 @@ class NEATGenotype(object):
             cm = np.insert(cm, 0, 0.0, axis=0)
             # TODO: this is a bit ugly, we duplicate the first node type for the bias node 
             node_types = [node_types[0]] + list(node_types)
-        
+
+        if self.feedforward and np.triu(cm).any():
+            import pprint
+            pprint.pprint(self.node_genes)
+            pprint.pprint(self.conn_genes)
+            print ff
+            print order
+            print np.sign(cm)
+            raise Exception("Network is not feedforward.")
         
         return cm, node_types
         
@@ -369,8 +386,7 @@ class NEATPopulation(SimplePopulation):
                  old_multiplier=0.2,
                  stagnation_age=15,
                  stop_when_solved=False,
-                 verbose=True,
-                 parallel=True):
+                 verbose=True):
         """ Initializes the object with settings,
             does not create a population yet.
             
@@ -394,7 +410,6 @@ class NEATPopulation(SimplePopulation):
         self.stagnation_age                = stagnation_age
         self.stop_when_solved              = stop_when_solved
         self.verbose                       = verbose
-        self.parallel                      = parallel
         
 
     def _reset(self):

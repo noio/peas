@@ -18,22 +18,22 @@ from ..methods.neat import NEATGenotype
 
 # Shortcuts
 
-inf  = float('inf')
+inf = float('inf')
+sqrt_two_pi = np.sqrt(np.pi * 2)
 
 ### FUNCTIONS ###
 
 # Node functions
-def linear(x, clip=(-1.0, 1.0)):
+def ident(x):
+    return x
+
+def bound(x, clip=(-1.0, 1.0)):
     return np.clip(x, *clip)
 
-def linear3(x, clip=(-3.0, 3.0)):
-    return np.clip(x, *clip)
-
-def gauss(x, mean=0.0, std=1.0):
+def gauss(x):
     """ Returns the pdf of a gaussian.
     """
-    z = (x - mean) / std
-    return np.exp(-z**2 / 2.0) / np.sqrt(2*np.pi) / std
+    return np.exp(-x ** 2 / 2.0) / sqrt_two_pi
     
 def sigmoid(x):
     """ Sigmoid function. 
@@ -50,13 +50,14 @@ def sigmoid(x):
 ACTIVATION_FUNCS = {
     'sin': np.sin,
     'abs': np.abs,
-    'linear': linear,
-    'linear3': linear3,
+    'ident': ident,
+    'linear': ident,
+    'bound': bound,
     'gauss': gauss,
     'sigmoid': sigmoid,
     'exp': sigmoid,
     'tanh': np.tanh,
-    None : linear
+    None : ident
 }
 
 
@@ -118,11 +119,11 @@ class NeuralNetwork(object):
                 raise Exception("NEAT Chromosome does not describe feedforward network.")
         node_order.remove('bias')
         self.node_types = [ACTIVATION_FUNCS[nodes[i].activation_type] for i in node_order]
-        self.node_types = [linear] + self.node_types
+        self.node_types = [ident] + self.node_types
         self.act = np.zeros(self.cm.shape[0])
         return self
     
-    def __init__(self, source=None, max_activation=100.0):
+    def __init__(self, source=None):
         # Set instance vars
         self.feedforward    = False
         self.sandwich       = False   
@@ -130,11 +131,12 @@ class NeuralNetwork(object):
         self.node_types     = None
         self.single_type    = None
         self.original_shape = None
-        self.max_activation = max_activation
         
         if source is not None:
             if isinstance(source, NEATGenotype):
                 self.from_matrix(*source.get_network_data())
+                if source.feedforward:
+                    self.make_feedforward()
             elif isinstance(source, neat.chromosome.Chromosome):
                 self.from_neatchromosome(source)
             else:
@@ -156,9 +158,10 @@ class NeuralNetwork(object):
     def make_feedforward(self):
         """ Zeros out all recursive connections. 
         """
+        if np.triu(self.cm).any():
+            raise Exception("Connection Matrix does not describe feedforward network. \n %s" % np.sign(self.cm))
         self.feedforward = True
         self.cm[np.triu_indices(self.cm.shape[0])] = 0
-        return self
         
     def flush(self):
         """ Reset activation values. """
@@ -172,42 +175,47 @@ class NeuralNetwork(object):
             
             :param add_bias: Add a bias input automatically, before other inputs.
         """
+        act = self.act
+        node_types = self.node_types
+        cm = self.cm
         
         if add_bias:
             input_activation = np.hstack((1.0, input_activation))
         
-        if input_activation.size >= self.act.size:
-            raise Exception("More input values (%s) than nodes (%s)." % (input_activation.shape, self.act.shape))
+        if input_activation.size >= act.size:
+            raise Exception("More input values (%s) than nodes (%s)." % (input_activation.shape, act.shape))
         
-        input_size = min(self.act.size - 1, input_activation.size)
+        input_size = min(act.size - 1, input_activation.size)
+        node_count = act.size
         
         # Feed forward nets reset the activation, then activate once
         # for every node in the network.
         if self.feedforward:
-            self.act = np.zeros(self.cm.shape[0])
-            self.act[:input_size] = input_activation.flat[:input_size]
-            for i in xrange(input_size, self.act.size):
-                self.act[i] = self.node_types[i](np.dot(self.cm[i], self.act))
+            act = np.zeros(cm.shape[0])
+            act[:input_size] = input_activation.flat[:input_size]
+            for i in xrange(input_size, node_count):
+                act[i] = node_types[i](np.dot(cm[i], act))
         # Sandwich networks activate once globally, and need a single activation
         # type.
         elif self.sandwich:
-            self.act[:input_size] = input_activation.flat[:input_size]
-            self.act = np.dot(self.cm, self.act)
-            self.act = self.single_type(self.act)
+            act[:input_size] = input_activation.flat[:input_size]
+            act = np.dot(self.cm, act)
+            act = self.single_type(act)
         # All other recursive networks only activate once too, upon feeding
         # this means that upon each feed, activation propagate by one step.
         else:
-            self.act[:input_size] = input_activation.flat[:input_size]
-            self.act = np.dot(self.cm, self.act)
-            for i in xrange(len(self.node_types)):
-                self.act[i] = self.node_types[i](self.act[i])
+            act[:input_size] = input_activation.flat[:input_size]
+            act = np.dot(self.cm, act)
+            for i in xrange(len(node_types)):
+                act[i] = node_types[i](act[i])
             
-        self.act = np.clip(self.act, -self.max_activation, self.max_activation)
         # Reshape the output to 2D if it was 2D
         if self.sandwich:
-            return self.act[self.act.size//2:].reshape(self.original_shape)      
+            return act[act.size//2:].reshape(self.original_shape)      
         else:
-            return self.act.reshape(self.original_shape)
+            return act.reshape(self.original_shape)
+
+        self.act = act
 
     
     def visualize(self, filename, inputs=3, outputs=1):
