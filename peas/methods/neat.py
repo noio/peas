@@ -37,6 +37,7 @@ class NEATGenotype(object):
                  topology=None,
                  feedforward=True,
                  max_depth=None,
+                 max_nodes=inf,
                  response_default=4.924273,
                  initial_weight_stdev=2.0,
                  bias_as_node=False,
@@ -45,7 +46,7 @@ class NEATGenotype(object):
                  prob_mutate_weight=0.8,
                  prob_reenable_conn=0.01,
                  prob_mutate_bias=0.2,
-                 prob_mutate_response=0.2,
+                 prob_mutate_response=0.0,
                  prob_mutate_type=0.2,
                  stdev_mutate_weight=1.5,
                  stdev_mutate_bias=0.5,
@@ -61,13 +62,19 @@ class NEATGenotype(object):
         # Settings
         self.inputs               = inputs
         self.outputs              = outputs
+        
+        # Restrictions
         self.types                = types
         self.feedforward          = feedforward
         self.max_depth            = max_depth
+        self.max_nodes            = max_nodes
+        
+        # Settings
         self.response_default     = response_default
         self.initial_weight_stdev = initial_weight_stdev
         self.bias_as_node         = bias_as_node
         
+        # Mutation probabilities
         self.prob_add_conn        = prob_add_conn
         self.prob_add_node        = prob_add_node
         self.prob_mutate_weight   = prob_mutate_weight
@@ -76,6 +83,7 @@ class NEATGenotype(object):
         self.prob_mutate_response = prob_mutate_response
         self.prob_mutate_type     = prob_mutate_type
         
+        # Mutation effects
         self.stdev_mutate_weight   = stdev_mutate_weight
         self.stdev_mutate_bias     = stdev_mutate_bias
         self.stdev_mutate_response = stdev_mutate_response
@@ -136,7 +144,7 @@ class NEATGenotype(object):
         """
         maxinnov = max(global_innov, max(cg[0] for cg in self.conn_genes.values()))
         
-        if rand() < self.prob_add_node:
+        if len(self.node_genes) < self.max_nodes and rand() < self.prob_add_node:
             possible_to_split = self.conn_genes.keys()
             # If there is a max depth, we can only split connections that skip a layer.
             # E.g. we can split a connection from layer 0 to layer 2, because the resulting

@@ -4,6 +4,7 @@
 
 ### IMPORTS ###
 import math
+import os
 
 # Libraries
 import numpy as np
@@ -60,6 +61,9 @@ class TargetWeightsTask(object):
         cm = network.cm
         target = self.target
         error = (cm - target) ** 2
+        directory = os.path.dirname(filename)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
         plt.imsave(filename, np.hstack((network.cm, self.target, error)), cmap=plt.cm.RdBu)
 
         
