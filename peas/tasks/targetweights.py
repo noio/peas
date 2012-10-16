@@ -18,12 +18,14 @@ from ..networks.rnn import NeuralNetwork
 
 class TargetWeightsTask(object):
     
-    def __init__(self, default_weight=0, substrate_shape=(3,3), noise=0.1, max_weight=3.0,
+    def __init__(self, default_weight=0, substrate_shape=(3,3), noise=0, max_weight=3.0,
                 funcs=[] 
                 ):
         # Instance vars
         self.substrate_shape = substrate_shape
         self.max_weight      = max_weight
+        if not (0 <= noise < 1):
+            raise Exception("Noise value has to be between 0 and 1.")
         # Build the connectivity matrix coords system
         cm_shape = list(substrate_shape) + list(substrate_shape)
         coords = np.mgrid[[slice(-1, 1, s*1j) for s in cm_shape]]
