@@ -24,7 +24,7 @@ class TargetWeightsTask(object):
         # Instance vars
         self.substrate_shape = substrate_shape
         self.max_weight      = max_weight
-        if not (0 <= noise < 1):
+        if not (0 <= noise <= 1):
             raise Exception("Noise value has to be between 0 and 1.")
         # Build the connectivity matrix coords system
         cm_shape = list(substrate_shape) + list(substrate_shape)
