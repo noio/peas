@@ -59,7 +59,7 @@ class VisualFieldTask(object):
         for pattern, (x,y) in random.sample(self.cases, min(self.trials, len(self.cases))):
             output = network.feed(pattern, add_bias=False)
             self._history.append((pattern, output))
-            output *= 1 + 0.01 * np.random.random(output.shape)
+            # output *= 1 + 0.01 * np.random.random(output.shape)
             if output.size != pattern.size:
                 raise Exception("Network output size (%s) does not correspond to pattern size (%s)" % 
                                     (output.shape, pattern.shape))

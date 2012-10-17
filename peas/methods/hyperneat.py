@@ -19,9 +19,10 @@ class HyperNEATDeveloper(object):
     
     def __init__(self, substrate=None, substrate_shape=None, 
                  sandwich=False, 
+                 add_deltas=False,
                  weight_range=3.0, 
                  min_weight=0.3,
-                 activation_steps=5,
+                 activation_steps=10,
                  node_type='tanh'):
         """ Constructor 
 
@@ -34,6 +35,7 @@ class HyperNEATDeveloper(object):
         """
         self.substrate        = substrate
         self.sandwich         = sandwich
+        self.add_deltas       = add_deltas
         self.weight_range     = weight_range
         self.min_weight       = min_weight
         self.activation_steps = activation_steps
@@ -78,12 +80,18 @@ class HyperNEATDeveloper(object):
         cm = np.zeros((len(self.substrate), len(self.substrate)))
             
         for (i, fr), (j, to) in product(enumerate(self.substrate), repeat=2):
+            if not self.add_deltas:
+                net_input = np.hstack((fr, to))
+            else:
+                deltas = np.array(to) - np.array(fr) 
+                net_input = np.hstack((fr, to, deltas))
+                
             if network.feedforward:
-                weight = network.feed(np.hstack((fr, to)))[-1]
+                weight = network.feed(net_input)[-1]
             else:
                 network.flush()
                 for _ in xrange(self.activation_steps):
-                    weight = network.feed(np.hstack((fr, to)))[-1]
+                    weight = network.feed(net_input)[-1]
             cm[j, i] = weight
         
         # Rescale the CM
