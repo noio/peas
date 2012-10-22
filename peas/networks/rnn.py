@@ -231,7 +231,7 @@ class NeuralNetwork(object):
             inputs = cm.shape[0] // 2
             outputs = inputs
         # Clear connections to input nodes, these arent used anyway
-        cm[:inputs, :] = 0
+
         G = pgv.AGraph(directed=True)
         mw = abs(cm).max()
         for i in range(cm.shape[0]):

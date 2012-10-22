@@ -83,7 +83,7 @@ class VisualFieldTask(object):
         matplotlib.use('Agg',warn=False)
         import matplotlib.pyplot as plt
         # Visualize
-        self.do(network)
+        self.evaluate(network)
         im = np.zeros((0,self.size*2 + 1))
         for (i, o) in self._history[:5]:
             if self.dims == 1:

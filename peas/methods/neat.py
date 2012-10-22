@@ -100,7 +100,7 @@ class NEATGenotype(object):
         if self.bias_as_node:
             self.inputs += 1
             
-        max_layer = sys.maxint if (self.max_depth is None) else self.max_depth
+        max_layer = sys.maxint if (self.max_depth is None) else (self.max_depth - 1)
         
         if topology is None:
             # The default method of creating a genotype
@@ -112,7 +112,7 @@ class NEATGenotype(object):
             for i in xrange(self.inputs):
                 # We set the 'response' to 4.924273. Stanley doesn't mention having the response
                 # be subject to evolution, so this is #weird, but we'll do it because neat-python does.
-                self.node_genes.append( [i * 1024.0, random.choice(self.types), 0.0, self.response_default, 0] )
+                self.node_genes.append( [i * 1024.0, "linear", 0.0, self.response_default, 0] )
             
             # Create output nodes
             for i in xrange(self.outputs):
@@ -130,7 +130,7 @@ class NEATGenotype(object):
             fr, to = zip(*topology)
             maxnode = max(max(fr), max(to))
             for i in xrange(maxnode+1):
-                self.node_genes.append( [i * 1024.0, random.choice(self.types), 0.0, self.response_default] )
+                self.node_genes.append( [i * 1024.0, random.choice(self.types), 0.0, self.response_default, i] )
             innov = 0
             for fr, to in topology:
                 self.conn_genes[(fr, to)] = [innov, fr, to, np.random.normal(0.0, self.initial_weight_stdev), True]
@@ -184,7 +184,7 @@ class NEATGenotype(object):
         # This is #weird, why use "elif"? but this is what
         # neat-python does, so I'm copying.
         elif rand() < self.prob_add_conn:
-            potential_conns = product(xrange(self.inputs, len(self.node_genes)), xrange(len(self.node_genes)))
+            potential_conns = product(xrange(len(self.node_genes)), xrange(self.inputs, len(self.node_genes)))
             potential_conns = (c for c in potential_conns if c not in self.conn_genes)
             # Filter further connections if we're looking only for FF networks
             if self.feedforward:
@@ -216,7 +216,8 @@ class NEATGenotype(object):
                 if rand() < self.prob_reenable_conn:
                     cg[4] = True
                     
-            for node_gene in self.node_genes:
+            # Mutate non-input nodes
+            for node_gene in self.node_genes[self.inputs:]:
                 if rand() < self.prob_mutate_bias:
                     node_gene[2] += np.random.normal(0, self.stdev_mutate_bias)
                     node_gene[2] = np.clip(node_gene[2], self.weight_range[0], self.weight_range[1])
@@ -557,6 +558,7 @@ class NEATPopulation(SimplePopulation):
         print "\n== Generation %d ==" % self.generation
         print "Best (%.2f): %s" % (self.champions[-1].stats['fitness'], self.champions[-1])
         print "Solved: %s" % (self.solved_at)
+        print "Species: %s" % ([len(s.members) for s in self.species]) 
         print "Age: %s" % ([s.age for s in self.species])
         print "No improvement: %s" % ([s.no_improvement_age for s in self.species])
         
