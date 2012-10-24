@@ -130,7 +130,7 @@ class NEATGenotype(object):
             fr, to = zip(*topology)
             maxnode = max(max(fr), max(to))
             for i in xrange(maxnode+1):
-                self.node_genes.append( [i * 1024.0, random.choice(self.types), 0.0, self.response_default, i] )
+                self.node_genes.append( [i * 1024.0, random.choice(self.types), 0.0, self.response_default, i + 1] )
             innov = 0
             for fr, to in topology:
                 self.conn_genes[(fr, to)] = [innov, fr, to, np.random.normal(0.0, self.initial_weight_stdev), True]

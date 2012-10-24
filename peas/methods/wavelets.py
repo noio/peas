@@ -11,6 +11,9 @@ import random
 import numpy as np
 import scipy.misc
 
+# Local
+from ..networks.rnn import NeuralNetwork
+
 # Shortcuts
 rand = random.random
 
@@ -70,20 +73,34 @@ class WaveletGenotype(object):
         return self # for chaining
                 
                 
-    def get_network_data(self):
-        x, y = np.meshgrid(np.linspace(-1, 1, self.output_size), np.linspace(-1, 1, self.output_size))
-        cm = np.zeros((self.output_size, self.output_size))
+    def get_image(self, s):
+        x, y = np.meshgrid(np.linspace(-1, 1, s), np.linspace(-1, 1, s))
+        cm = np.zeros((s, s))
         
         for wavelet in self.wavelets:
             weight, sigma, mat = wavelet
             lx, ly = transform_meshgrid(x, y, mat)
             cm += weight * gabor(lx, ly, sigma=sigma)
             
-        node_types = ['linear'] * cm.shape[0]
-        return cm, node_types
+        return cm
         
     def __str__(self):
         return "%s with %d wavelets" % (self.__class__.__name__, len(self.wavelets))
+        
+        
+class WaveletDeveloper(object):
+    """ Very simple class to develop the wavelet genotype to a
+        neural network.
+    """
+    def __init__(self, substrate_shape=None,
+                       node_type='tanh'):
+        self.substrate_shape = substrate_shape
+        self.node_type = node_type
+        
+    
+    def convert(self, wavelets):
+        cm = wavelets.get_image(self.substrate_shape)
+        return NeuralNetwork().from_matrix(cm, node_types=[self.node_type])
         
 if __name__ == '__main__':
     pass
