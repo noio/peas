@@ -83,12 +83,12 @@ class VisualFieldTask(object):
         matplotlib.use('Agg',warn=False)
         import matplotlib.pyplot as plt
         # Visualize
-        self.evaluate(network)
-        im = np.zeros((0,self.size*2 + 1))
-        for (i, o) in self._history[:5]:
-            if self.dims == 1:
-                i = np.tile(i, (1,1))
-                o = np.tile(o, (1,1))
-            trial = np.hstack((i, np.zeros((i.shape[0],1)), o))
-            im = np.vstack((im, np.zeros((1, trial.shape[1])), trial))
-        plt.imsave(filename, im, cmap=plt.cm.hot, vmin=0)  
+        # self.evaluate(network)
+        # im = np.zeros((0,self.size*2 + 1))
+        # for (i, o) in self._history[:5]:
+        #     if self.dims == 1:
+        #         i = np.tile(i, (1,1))
+        #         o = np.tile(o, (1,1))
+        #     trial = np.hstack((i, np.zeros((i.shape[0],1)), o))
+        #     im = np.vstack((im, np.zeros((1, trial.shape[1])), trial))
+        plt.imsave(filename, network.cm[network.cm.shape[0]/2:, :network.cm.shape[1]/2], cmap=plt.cm.hot, vmin=0)  

@@ -155,6 +155,9 @@ class NeuralNetwork(object):
         self.act = np.zeros(self.cm.shape[0])
         return self
         
+    def num_nodes(self):
+        return self.cm.shape[0]
+        
     def make_feedforward(self):
         """ Zeros out all recursive connections. 
         """
