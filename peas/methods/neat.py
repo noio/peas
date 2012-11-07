@@ -228,6 +228,9 @@ class NEATGenotype(object):
                 if rand() < self.prob_mutate_response:
                     node_gene[3] += np.random.normal(0, self.stdev_mutate_response)
                     
+        for (fr, to) in self.conn_genes:
+            if self.node_genes[to][4] == 0:
+                raise Exception("Connection TO input node not allowed.")
         return self # For chaining
         
     def mate(self, other):
