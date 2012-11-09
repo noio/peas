@@ -1,6 +1,6 @@
 #! /usr/bin/python
 
-""" Collection of benchmark tasks for evoluationary 
+""" Collection of benchmark tasks for evolutionary 
     algorithms
 """
 
