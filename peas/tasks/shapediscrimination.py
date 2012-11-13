@@ -88,6 +88,7 @@ class ShapeDiscriminationTask(object):
             raise Exception("Object Discrimination task should be performed by a sandwich net.")
         
         dist = 0.0
+        correct = 0
         for _ in xrange(self.trials):
             pattern = np.zeros((self.size, self.size))
             targetsize = self.target.shape[0]
@@ -110,13 +111,11 @@ class ShapeDiscriminationTask(object):
             output = network.feed(pattern, add_bias=False)
             mx = output.argmax()
             (x_, y_) = mx // self.size, mx % self.size
-            # WSOSE = (1 - output[cx, cy]) ** 2
-            dist += ((x_ - cx) ** 2) + ((y_ - cy) ** 2)
+            dist += np.sqrt(((x_ - cx) ** 2) + ((y_ - cy) ** 2))
+            if dist == 0:
+                correct += 1
             
         dist = dist / self.trials
         score = 1. / (1. + dist)
-        return {'fitness':score}
+        return {'fitness':score, 'correct':correct, 'dist':dist}
         
-if __name__ == '__main__':
-    a = ShapeDiscriminationTask('scx')
-    a.evaluate(None)

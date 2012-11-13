@@ -181,6 +181,7 @@ class NeuralNetwork(object):
         act = self.act
         node_types = self.node_types
         cm = self.cm
+        input_shape = input_activation.shape
         
         if add_bias:
             input_activation = np.hstack((1.0, input_activation))
@@ -214,7 +215,7 @@ class NeuralNetwork(object):
             
         # Reshape the output to 2D if it was 2D
         if self.sandwich:
-            return act[act.size//2:].reshape(self.original_shape)      
+            return act[act.size//2:].reshape(input_shape)      
         else:
             return act.reshape(self.original_shape)
 

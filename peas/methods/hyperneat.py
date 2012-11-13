@@ -20,7 +20,8 @@ class HyperNEATDeveloper(object):
     def __init__(self, substrate=None, substrate_shape=None, 
                  sandwich=False, 
                  add_deltas=False,
-                 weight_range=3.0, 
+                 weight_range=3.0,
+                 max_connection_range=None, 
                  min_weight=0.3,
                  activation_steps=10,
                  node_type='tanh'):
@@ -33,14 +34,15 @@ class HyperNEATDeveloper(object):
             :param sandwich:       Whether to turn the output net into a sandwich network.
             :param node_type:      What node type to assign to the output nodes.
         """
-        self.substrate        = substrate
-        self.sandwich         = sandwich
-        self.add_deltas       = add_deltas
-        self.weight_range     = weight_range
-        self.min_weight       = min_weight
-        self.activation_steps = activation_steps
-        self.node_type        = node_type
-        self.substrate_shape  = substrate_shape
+        self.substrate            = substrate
+        self.sandwich             = sandwich
+        self.add_deltas           = add_deltas
+        self.weight_range         = weight_range
+        self.max_connection_range = max_connection_range
+        self.min_weight           = min_weight
+        self.activation_steps     = activation_steps
+        self.node_type            = node_type
+        self.substrate_shape      = substrate_shape
         
         if substrate_shape is not None:
             # Create coordinate grids
@@ -80,6 +82,10 @@ class HyperNEATDeveloper(object):
         cm = np.zeros((len(self.substrate), len(self.substrate)))
             
         for (i, fr), (j, to) in product(enumerate(self.substrate), repeat=2):
+            # Skip if outside max connection range, 
+            # This behavior is used in O.J. Coleman's experiments.
+            if np.any(np.abs(fr - to) > self.max_connection_range):
+                continue
             if not self.add_deltas:
                 net_input = np.hstack((fr, to))
             else:
