@@ -116,7 +116,7 @@ class ShapeDiscriminationTask(object):
             dist += np.sqrt(((x_ - cx) ** 2) + ((y_ - cy) ** 2))
             if dist == 0:
                 correct += 1
-            wsose += 0.5 * (1 - output[mx]) + 0.5 * output.mean()
+            wsose += 0.5 * (1 - output.flat[mx]) + 0.5 * output.mean()
             
         correct /= self.trials
         dist /= self.trials
