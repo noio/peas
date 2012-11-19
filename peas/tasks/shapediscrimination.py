@@ -124,7 +124,7 @@ class ShapeDiscriminationTask(object):
         
         if self.fitnessmeasure == 'dist':
             fitness = (1. / 1. + dist)
-        elif self.fitnessmeasure = 'wsose':
+        elif self.fitnessmeasure == 'wsose':
             fitness = 0.5 * pc + 0.5 * (1 - wsose)
         return {'fitness':fitness, 'correct':pc, 'dist':dist, 'wsose':wsose}
         
