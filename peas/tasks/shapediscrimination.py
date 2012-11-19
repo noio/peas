@@ -43,11 +43,12 @@ def line(im, x0, y0, x1, y1):
 
 class ShapeDiscriminationTask(object):
     
-    def __init__(self, setup, size=15, trials=200):
+    def __init__(self, setup, size=15, trials=50, fitnessmeasure='dist'):
         """ Constructor """
-        self.size = size
-        self.trials = trials
-        setup = setup.lower()
+        self.size           = size
+        self.trials         = trials
+        self.fitnessmeasure = fitnessmeasure
+        setup               = setup.lower()
         
         if setup == 'scx':
             target = 'square'
@@ -88,7 +89,8 @@ class ShapeDiscriminationTask(object):
             raise Exception("Object Discrimination task should be performed by a sandwich net.")
         
         dist = 0.0
-        correct = 0
+        correct = 0.0
+        wsose = 0.0
         for _ in xrange(self.trials):
             pattern = np.zeros((self.size, self.size))
             targetsize = self.target.shape[0]
@@ -114,8 +116,15 @@ class ShapeDiscriminationTask(object):
             dist += np.sqrt(((x_ - cx) ** 2) + ((y_ - cy) ** 2))
             if dist == 0:
                 correct += 1
+            wsose += 0.5 * (1 - output[mx]) + 0.5 * output.mean()
             
-        dist = dist / self.trials
-        score = 1. / (1. + dist)
-        return {'fitness':score, 'correct':correct, 'dist':dist}
+        pc /= self.trials
+        dist /= self.trials
+        wsose /= self.trials
+        
+        if self.fitnessmeasure == 'dist':
+            fitness = (1. / 1. + dist)
+        elif self.fitnessmeasure = 'wsose':
+            fitness = 0.5 * pc + 0.5 * (1 - wsose)
+        return {'fitness':fitness, 'correct':pc, 'dist':dist, 'wsose':wsose}
         

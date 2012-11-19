@@ -84,8 +84,9 @@ class HyperNEATDeveloper(object):
         for (i, fr), (j, to) in product(enumerate(self.substrate), repeat=2):
             # Skip if outside max connection range, 
             # This behavior is used in O.J. Coleman's experiments.
-            if np.any(np.abs(fr - to) > self.max_connection_range):
+            if self.max_connection_range is not None and np.any(np.abs(fr - to) > self.max_connection_range):
                 continue
+            
             if not self.add_deltas:
                 net_input = np.hstack((fr, to))
             else:
