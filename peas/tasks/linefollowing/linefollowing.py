@@ -166,7 +166,7 @@ class LineFollowingTask(object):
         if draw:
             pygame.quit()
 
-        return {'fitness':path_length(path)}
+        return {'fitness':1+path_length(path)}
         
     def solve(self, network):
         return False
