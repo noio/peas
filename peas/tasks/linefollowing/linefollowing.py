@@ -36,12 +36,15 @@ def path_length(path):
 class Robot(object):
     """ Robot that performs this task. """
     
-    def __init__(self, space, field, 
+    def __init__(self, space, field_friction, field_observation,
                        size=8, 
-                       wheeltorque=10, 
+                       wheeltorque=6,
+                       friction_scale=0.1, 
                        start=(256,256)):
-        self.field = field
+        self.field_friction = field_friction
+        self.field_observation = field_observation
         self.size = size
+        self.friction_scale = friction_scale
         self.wheeltorque = wheeltorque
         
         mass = size ** 2 * 0.2
@@ -63,18 +66,22 @@ class Robot(object):
             
     def sensor_response(self):
         for point in self.sensor_locations():
-            yield self.field_at(point)
+            yield self.field_at(point, observation=True)
 
-    def field_at(self, (x,y), border=1.0):
-        if (0 <= x < self.field.shape[1] and 
-            0 <= y < self.field.shape[0]):
-            return self.field[int(y), int(x)]
+    def field_at(self, (x,y), border=1.0, observation=False):
+        if (0 <= x < self.field_friction.shape[1] and 
+            0 <= y < self.field_friction.shape[0]):
+            if observation:
+                return self.field_observation[int(y), int(x)]
+            else:
+                return self.field_friction[int(y), int(x)]
         return border
                 
     def apply_friction(self):
         f = self.field_at(self.body.position)
-        self.body.velocity.x = self.body.velocity.x * (1 - 0.5 * f)
-        self.body.velocity.y = self.body.velocity.y * (1 - 0.5 * f)
+        f = 1 - self.friction_scale * f
+        self.body.velocity.x = self.body.velocity.x * f
+        self.body.velocity.y = self.body.velocity.y * f
 
     def drive(self, l, r):
         l *= self.wheeltorque
@@ -95,14 +102,18 @@ class LineFollowingTask(object):
     """ Line following task.
     """
     
-    def __init__(self, field='eight.png',
-                       max_steps=5000):
+    def __init__(self, field='eight', observation='eight_striped',
+                       max_steps=1000):
         # Settings
         self.max_steps = max_steps
-        self.fieldpath = os.path.join(DATA_DIR,field)
+        self.fieldpath = os.path.join(DATA_DIR,field) + '.png'
+        self.observationpath = os.path.join(DATA_DIR,observation) + '.png'
         print "Using %s" % (self.fieldpath,)
-        self.field = imread(self.fieldpath)
-        self.field = self.field[:,:,0].astype(np.float)/255
+        field_friction = imread(self.fieldpath)
+        field_observation = imread(self.observationpath)
+        
+        self.field_friction = field_friction[:,:,0].astype(np.float)/255
+        self.field_observation   = field_observation[:,:,0].astype(np.float)/255
         
         
     def evaluate(self, network, draw=False):
@@ -112,7 +123,7 @@ class LineFollowingTask(object):
         if not isinstance(network, NeuralNetwork):
             network = NeuralNetwork(network)
         
-        h,w = self.field.shape
+        h,w = self.field_friction.shape
         
         if draw:
             import pygame
@@ -122,15 +133,15 @@ class LineFollowingTask(object):
             clock = pygame.time.Clock()
             running = True
             font = pygame.font.Font(pygame.font.get_default_font(), 8)
-            field_image = pygame.image.load(self.fieldpath)
+            field_image = pygame.image.load(self.observationpath)
         
         # Initialize pymunk
         self.space = space = pymunk.Space()
         space.gravity = (0,0)
-        space.damping = 0.2
+        space.damping = 0.9
 
         # Create objects
-        robot = Robot(space, self.field)
+        robot = Robot(space, self.field_friction, self.field_observation)
     
         path = [(robot.body.position.int_tuple)]
         
