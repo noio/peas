@@ -43,38 +43,55 @@ def line(im, x0, y0, x1, y1):
 
 class ShapeDiscriminationTask(object):
     
-    def __init__(self, setup, size=15, trials=50, fitnessmeasure='dist'):
-        """ Constructor """
+    def __init__(self, targetshape=None, 
+                       distractorshapes=None, size=15, trials=75, fitnessmeasure='dist'):
+        """ Constructor 
+            If target shape and distractor shape isn't passed,
+            the setup from the visual field experiment (big-box-little-box)
+            is used. Otherwise, use makeshape() to initalize the target and
+            distractor shapes.
+        """
+        self.target         = targetshape
+        self.distractors    = distractorshapes
         self.size           = size
         self.trials         = trials
         self.fitnessmeasure = fitnessmeasure
-        setup               = setup.lower()
-        
-        if setup == 'scx':
-            target = 'square'
-            distractors = ['circle', 'x']
-        else:
-            raise Exception("Unknown Setup")
+             
+        if self.target is None:
+            self.target = self.makeshape('box', size//3)
+        if self.distractors is None:
+            self.distractors = [self.makeshape('box', 1)]
             
-        self.target = self.makeshape(target, size//3)
-        self.distractors = [self.makeshape(d, size//3) for d in distractors]
+        print ":::: Target Shape ::::"
+        print self.target
+        print ":::: Distractor Shapes ::::"
+        for d in self.distractors:
+            print d
         
-    def makeshape(self, shape, size=5):
+    @classmethod
+    def makeshape(cls, shape, size=5):
         """ Create an image of the given shape.
         """
         im = np.zeros((size, size))
         xx, yy = np.mgrid[-1:1:size*1j, -1:1:size*1j]
         
-        if shape == 'square':
+        # Box used for big-box-little-box.
+        if shape == 'box':
+            im[:] = 1
+            
+        # Outlined square
+        elif shape == 'square':
             im[:,0] = 1;
             im[0,:] = 1;
             im[:,-1] = 1;
             im[-1,:] = 1;
             
+        # (roughly) a circle.
         elif shape == 'circle':                
             d = np.sqrt(xx * xx + yy * yy)
             im[ np.logical_and(0.65 <= d, d <= 1.01) ] = 1
             
+        # An single-pixel lined X
         elif shape == 'x':
             line(im, 0, 0, size-1, size-1)
             line(im, 0, size-1, size-1, 0)
@@ -128,3 +145,6 @@ class ShapeDiscriminationTask(object):
             fitness = 0.5 * correct + 0.5 * (1 - wsose)
         return {'fitness':fitness, 'correct':correct, 'dist':dist, 'wsose':wsose}
         
+    def solve(self, network):
+        return self.evaluate(network) > 0.5
+    
