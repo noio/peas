@@ -75,7 +75,7 @@ class VisualFieldTask(object):
         return {'fitness': score}
         
     def solve(self, network):
-        return self.evaluate(network) > 0.5
+        return self.evaluate(network)['fitness'] > 0.5
         
     def visualize(self, network, filename):
         """ Visualize a solution strategy by the given individual. """

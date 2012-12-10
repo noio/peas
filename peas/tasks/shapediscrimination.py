@@ -139,6 +139,7 @@ class ShapeDiscriminationTask(object):
         dist /= self.trials
         wsose /= self.trials
         
+        
         if self.fitnessmeasure == 'dist':
             fitness = 1. / (1. + dist)
         elif self.fitnessmeasure == 'wsose':
@@ -146,5 +147,5 @@ class ShapeDiscriminationTask(object):
         return {'fitness':fitness, 'correct':correct, 'dist':dist, 'wsose':wsose}
         
     def solve(self, network):
-        return self.evaluate(network) > 0.5
+        return self.evaluate(network)['fitness'] > 0.5
     
