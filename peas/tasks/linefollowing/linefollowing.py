@@ -36,20 +36,22 @@ def path_length(path):
 class Robot(object):
     """ Robot that performs this task. """
     
-    def __init__(self, space, field_friction, field_observation,
+    def __init__(self, space, field_friction, field_observation, initial_pos,
                        size=8, 
                        motor_torque=6,
-                       friction_scale=0.2, 
-                       start=(256,256)):
+                       friction_scale=0.2,
+                       angular_damping=0.9):
         self.field_friction = field_friction
         self.field_observation = field_observation
         self.size = size
         self.friction_scale = friction_scale
         self.motor_torque = motor_torque
+        self.angular_damping = angular_damping
         
         mass = size ** 2 * 0.2
         self.body = body = pymunk.Body(mass, pymunk.moment_for_box(mass, size, size))
-        body.position = pymunk.Vec2d(start[0], start[1])
+        body.position = pymunk.Vec2d(initial_pos[0], initial_pos[1])
+        body.angle = initial_pos[2]
         self.shape = shape = pymunk.Poly.create_box(body, (size, size))
         shape.group = 1
         shape.collision_type = 1
@@ -82,6 +84,7 @@ class Robot(object):
         f = 1 - self.friction_scale * f
         self.body.velocity.x = self.body.velocity.x * f
         self.body.velocity.y = self.body.velocity.y * f
+        self.body.angular_velocity *= self.angular_damping
 
     def drive(self, l, r):
         l *= self.motor_torque
@@ -104,7 +107,10 @@ class LineFollowingTask(object):
     
     def __init__(self, field='eight', observation='eight_striped',
                        max_steps=1000, 
-                       friction_scale=0.2, motor_torque=6):
+                       friction_scale=0.2, 
+                       motor_torque=6,
+                       damping=0.2,
+                       initial_pos=None):
         # Settings
         self.max_steps = max_steps
         self.fieldpath = os.path.join(DATA_DIR,field) + '.png'
@@ -118,6 +124,10 @@ class LineFollowingTask(object):
         
         self.friction_scale = friction_scale
         self.motor_torque   = motor_torque
+        self.damping        = damping
+        self.initial_pos    = initial_pos
+        if self.initial_pos is None:
+            self.initial_pos = self.field_friction.shape[0] / 2, self.field_friction.shape[1]/2 , 0
         
         
     def evaluate(self, network, draw=False):
@@ -136,16 +146,16 @@ class LineFollowingTask(object):
             pygame.display.set_caption("Simulation")
             clock = pygame.time.Clock()
             running = True
-            font = pygame.font.Font(pygame.font.get_default_font(), 8)
+            font = pygame.font.Font(pygame.font.get_default_font(), 12)
             field_image = pygame.image.load(self.observationpath)
         
         # Initialize pymunk
         self.space = space = pymunk.Space()
         space.gravity = (0,0)
-        space.damping = 0.9
+        space.damping = self.damping
 
         # Create objects
-        robot = Robot(space, self.field_friction, self.field_observation, 
+        robot = Robot(space, self.field_friction, self.field_observation, self.initial_pos,
                              friction_scale=self.friction_scale, motor_torque=self.motor_torque)
     
         path = [(robot.body.position.int_tuple)]
@@ -170,6 +180,8 @@ class LineFollowingTask(object):
             if draw:
                 screen.fill((255, 255, 255))
                 screen.blit(field_image, (0,0))
+                txt = font.render('%d - %.0f' % (step, path_length(path)), False, (0,0,0) )
+                screen.blit(txt, (0,0))
                 # Draw path
                 if len(path) > 1:
                     pygame.draw.lines(screen, (0,0,255), False, path, 2)
@@ -183,11 +195,12 @@ class LineFollowingTask(object):
             pygame.quit()
             
         dist = path_length(path)
-        return {'fitness':1 + dist**2, 'dist':dist}
+        speed = dist / self.max_steps
+        return {'fitness':1 + dist**2, 'dist':dist, 'speed':speed}
         
     def solve(self, network):
         stats = self.evaluate(network)
-        return (stats['dist'] / self.max_steps) > 0.4
+        return stats['speed'] > 0.25
         
     def visualize(self, network, filename=None):
         """ Visualize a solution strategy by the given individual. """
