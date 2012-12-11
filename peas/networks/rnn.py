@@ -14,7 +14,7 @@ except ImportError:
     pass
 
 # Local
-from ..methods.neat import NEATGenotype
+
 
 # Shortcuts
 
@@ -133,15 +133,13 @@ class NeuralNetwork(object):
         self.original_shape = None
         
         if source is not None:
-            if isinstance(source, NEATGenotype):
-                self.from_matrix(*source.get_network_data())
-                if source.feedforward:
-                    self.make_feedforward()
-            elif isinstance(source, neat.chromosome.Chromosome):
+            if isinstance(source, neat.chromosome.Chromosome):
                 self.from_neatchromosome(source)
             else:
                 try:
                     self.from_matrix(*source.get_network_data())
+                    if hasattr(source, 'feedforward') and source.feedforward:
+                        self.make_feedforward()
                 except AttributeError:
                     raise Exception("Cannot convert from %s to %s" % (source.__class__, self.__class__))
 

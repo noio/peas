@@ -85,6 +85,8 @@ class Robot(object):
         self.body.velocity.x = self.body.velocity.x * f
         self.body.velocity.y = self.body.velocity.y * f
         self.body.angular_velocity *= self.angular_damping
+        # Zero out sideways motion. (i.e. 100% perpendicular friction)
+        self.body.velocity = self.body.velocity.projection(self.body.rotation_vector)
 
     def drive(self, l, r):
         l *= self.motor_torque

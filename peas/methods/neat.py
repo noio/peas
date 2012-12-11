@@ -17,6 +17,7 @@ np.seterr(over='warn', divide='raise')
 
 # Package
 from .evolution import SimplePopulation
+from ..networks.rnn import NeuralNetwork
 
 # Shortcuts
 rand = random.random
@@ -362,6 +363,9 @@ class NEATGenotype(object):
     def __str__(self):
         return '%s with %d nodes and %d connections.' % (self.__class__.__name__, 
             len(self.node_genes), len(self.conn_genes))
+            
+    def visualize(self, filename):
+        return NeuralNetwork(self).visualize(filename, inputs=self.inputs, outputs=self.outputs)
         
 class NEATSpecies(object):
     
