@@ -39,7 +39,7 @@ def transform_meshgrid(x, y, mat):
 
 class WaveletGenotype(object):
     
-    def __init__(self, inputs,
+    def __init__(self, inputs, layers=1,
                  prob_add=0.1,
                  prob_modify=0.3,
                  stdev_mutate=0.1,
@@ -49,12 +49,15 @@ class WaveletGenotype(object):
         self.prob_add     = prob_add
         self.prob_modify  = prob_modify
         self.stdev_mutate = stdev_mutate
-        self.wavelets     = [] # Each defined by an affine matrix.
+        self.wavelets     = [[]] * layers # Each defined by an affine matrix.
         
         for _ in xrange(initial):
-            self.add_wavelet()
+            for l in xrange(layers):
+                self.add_wavelet(l)
         
-    def add_wavelet(self):
+    def add_wavelet(self, layer=None):
+        if layer is None:
+            layer = np.random.randint(0, len(self.wavelets))
         t = rand((2, 1)) * 2 - 1
         mat = rand((2, self.inputs))
         norms = np.sqrt(np.sum(mat ** 2, axis=1))[:, np.newaxis]
@@ -63,18 +66,19 @@ class WaveletGenotype(object):
         sigma = np.random.normal(0.5, 0.3)
         weight = np.random.normal(0, 0.3)
         wavelet = [weight, sigma, mat]
-        self.wavelets.append(wavelet)
+        self.wavelets[layer].append(wavelet)
     
     def mutate(self):
         """ Mutate this individual """
         if rand() < self.prob_add:
             self.add_wavelet()
         else:   
-            for wavelet in self.wavelets:
-                if rand() < self.prob_modify:
-                    wavelet[0] += np.random.normal(self.stdev_mutate)
-                    wavelet[1] += np.random.normal(self.stdev_mutate)
-                    wavelet[2] += np.random.normal(0, self.stdev_mutate, wavelet[2].shape)
+            for layer in self.wavelets:
+                for wavelet in layer:
+                    if rand() < self.prob_modify:
+                        wavelet[0] += np.random.normal(self.stdev_mutate)
+                        wavelet[1] += np.random.normal(self.stdev_mutate)
+                        wavelet[2] += np.random.normal(0, self.stdev_mutate, wavelet[2].shape)
                 
         return self # for chaining
                         
@@ -108,7 +112,7 @@ class WaveletDeveloper(object):
             # Add a bias (translation)
             coords = np.hstack((coords, [1]))
             weight = sum(weight * gabor(*(np.dot(mat, coords)), sigma=sigma) 
-                        for (weight, sigma, mat) in individual.wavelets)
+                        for (weight, sigma, mat) in individual.wavelets[conn_id])
             cm[j,i] = weight
         
         # Rescale weights
