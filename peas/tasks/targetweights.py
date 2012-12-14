@@ -51,10 +51,11 @@ class TargetWeightsTask(object):
                 (network.cm.shape, self.target.shape))
         err = np.abs(network.cm - self.target)
         score = ((2 * self.max_weight) - err).mean()
-        return {'fitness': 2**score, 'error':err.mean()}
+        correct = (err < (self.max_weight / 10.0)).mean()
+        return {'fitness': 2**score, 'error':err.mean(), 'correct':correct}
         
     def solve(self, network):
-        return self.do(network) > 0.9
+        return self.evaluate(network)['correct'] > 0.8
         
     def visualize(self, network, filename):
         import matplotlib
