@@ -111,8 +111,6 @@ class WaveletDeveloper(object):
         for (i,j), coords, conn_id in self.substrate.get_connection_list(self.add_deltas):
             # Add a bias (translation)
             coords = np.hstack((coords, [1]))
-            print coords
-            print individual.wavelets
             weight = sum(weight * gabor(*(np.dot(mat, coords)), sigma=sigma) 
                         for (weight, sigma, mat) in individual.wavelets[conn_id])
             cm[j,i] = weight
