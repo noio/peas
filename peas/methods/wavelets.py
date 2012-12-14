@@ -15,7 +15,7 @@ import scipy.misc
 from ..networks.rnn import NeuralNetwork
 
 # Shortcuts
-rand = random.random
+rand = np.random.random
 
 ### FUNCTIONS ###
 
@@ -39,30 +39,36 @@ def transform_meshgrid(x, y, mat):
 
 class WaveletGenotype(object):
     
-    def __init__(self,
+    def __init__(self, inputs,
                  prob_add=0.1,
                  prob_modify=0.3,
                  stdev_mutate=0.1,
-                 output_size=10):
+                 initial=1):
         # Instance vars
+        self.inputs       = inputs
         self.prob_add     = prob_add
         self.prob_modify  = prob_modify
         self.stdev_mutate = stdev_mutate
-        self.output_size  = output_size
         self.wavelets     = [] # Each defined by an affine matrix.
+        
+        for _ in xrange(initial):
+            self.add_wavelet()
+        
+    def add_wavelet(self):
+        t = rand((2, 1)) * 2 - 1
+        mat = rand((2, self.inputs))
+        norms = np.sqrt(np.sum(mat ** 2, axis=1))[:, np.newaxis]
+        mat /= norms
+        mat = np.hstack((mat, t))
+        sigma = np.random.normal(0.5, 0.3)
+        weight = np.random.normal(0, 0.3)
+        wavelet = [weight, sigma, mat]
+        self.wavelets.append(wavelet)
     
     def mutate(self):
         """ Mutate this individual """
         if rand() < self.prob_add:
-            th = rand() * np.pi
-            cx, cy = rand() * 2 - 1, rand() * 2 - 1 
-            r = rand() + 0.5
-            mat = np.array([[np.cos(th) * r, -np.sin(th) * r, cx],
-                            [np.sin(th) * r,  np.cos(th) * r, cy]])
-            sigma = np.random.normal(0.5, 0.3)
-            weight = np.random.normal(0, 0.3)
-            wavelet = [weight, sigma, mat]
-            self.wavelets.append(wavelet)
+            self.add_wavelet()
         else:   
             for wavelet in self.wavelets:
                 if rand() < self.prob_modify:
@@ -71,19 +77,7 @@ class WaveletGenotype(object):
                     wavelet[2] += np.random.normal(0, self.stdev_mutate, wavelet[2].shape)
                 
         return self # for chaining
-                
-                
-    def get_image(self, s):
-        x, y = np.meshgrid(np.linspace(-1, 1, s), np.linspace(-1, 1, s))
-        cm = np.zeros((s, s))
-        
-        for wavelet in self.wavelets:
-            weight, sigma, mat = wavelet
-            lx, ly = transform_meshgrid(x, y, mat)
-            cm += weight * gabor(lx, ly, sigma=sigma)
-            
-        return cm
-        
+                        
     def __str__(self):
         return "%s with %d wavelets" % (self.__class__.__name__, len(self.wavelets))
         
@@ -92,15 +86,45 @@ class WaveletDeveloper(object):
     """ Very simple class to develop the wavelet genotype to a
         neural network.
     """
-    def __init__(self, substrate_shape=None,
-                       node_type='tanh'):
-        self.substrate_shape = substrate_shape
-        self.node_type = node_type
+    def __init__(self, substrate,
+                       add_deltas=False,
+                       min_weight=0.3,
+                       weight_range=3.0,
+                       node_type='tanh',
+                       sandwich=False):
+        # Fields
+        self.substrate    = substrate
+        self.add_deltas   = add_deltas
+        self.min_weight   = min_weight
+        self.weight_range = weight_range
+        self.node_type    = node_type
+        self.sandwich     = sandwich
         
     
-    def convert(self, wavelets):
-        cm = wavelets.get_image(self.substrate_shape)
-        return NeuralNetwork().from_matrix(cm, node_types=[self.node_type])
+    def convert(self, individual):
+        cm = np.zeros((self.substrate.num_nodes, self.substrate.num_nodes))
+        
+        for (i,j), coords, conn_id in self.substrate.get_connection_list(self.add_deltas):
+            # Add a bias (translation)
+            coords = np.hstack((coords, [1]))
+            weight = sum(weight * gabor(*(np.dot(mat, coords)), sigma=sigma) 
+                        for (weight, sigma, mat) in individual.wavelets)
+            cm[j,i] = weight
+        
+        # Rescale weights
+        cm[np.abs(cm) < self.min_weight] = 0
+        cm -= (np.sign(cm) * self.min_weight)
+        cm *= self.weight_range / (self.weight_range - self.min_weight)
+        
+        # Clip highest weights
+        cm = np.clip(cm, -self.weight_range, self.weight_range)
+        net = NeuralNetwork().from_matrix(cm, node_types=[self.node_type])
+        
+        if self.sandwich:
+            net.make_sandwich()
+
+        return net
+        
         
 if __name__ == '__main__':
     pass
