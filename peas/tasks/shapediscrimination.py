@@ -108,8 +108,9 @@ class ShapeDiscriminationTask(object):
         dist = 0.0
         correct = 0.0
         wsose = 0.0
+        pattern = np.zeros((self.size, self.size))
         for _ in xrange(self.trials):
-            pattern = np.zeros((self.size, self.size))
+            pattern *= 0.0
             targetsize = self.target.shape[0]
             distractor = random.choice(self.distractors)
             distsize = distractor.shape[0]
@@ -147,5 +148,5 @@ class ShapeDiscriminationTask(object):
         return {'fitness':fitness, 'correct':correct, 'dist':dist, 'wsose':wsose}
         
     def solve(self, network):
-        return self.evaluate(network)['fitness'] > 0.5
+        return self.evaluate(network)['dist'] < 0.5
     
