@@ -132,7 +132,7 @@ class LineFollowingTask(object):
             self.initial_pos = self.field_friction.shape[0] / 2, self.field_friction.shape[1]/2 , 0
         
         
-    def evaluate(self, network, draw=False):
+    def evaluate(self, network, draw=False, drawname='Simulation'):
         """ Evaluate the efficiency of the given network. Returns the
             distance that the bot ran
         """
@@ -145,7 +145,7 @@ class LineFollowingTask(object):
             import pygame
             pygame.init()
             screen = pygame.display.set_mode((w, h))
-            pygame.display.set_caption("Simulation")
+            pygame.display.set_caption(drawname)
             clock = pygame.time.Clock()
             running = True
             font = pygame.font.Font(pygame.font.get_default_font(), 12)
@@ -189,9 +189,11 @@ class LineFollowingTask(object):
                     pygame.draw.lines(screen, (0,0,255), False, path, 2)
                 robot.draw(screen)
                 
+                if pygame.event.get(pygame.QUIT):
+                    break
                 
                 pygame.display.flip()
-                clock.tick(50)
+                # clock.tick(50)
                 
         if draw:
             pygame.quit()
@@ -202,11 +204,11 @@ class LineFollowingTask(object):
         
     def solve(self, network):
         stats = self.evaluate(network)
-        return stats['speed'] > 0.25
+        return stats['speed'] > 0.20
         
     def visualize(self, network, filename=None):
         """ Visualize a solution strategy by the given individual. """
-        self.evaluate(network, draw=True)
+        self.evaluate(network, draw=True, drawname=filename)
         
 
 if __name__ == '__main__':

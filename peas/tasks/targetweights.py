@@ -32,9 +32,9 @@ class TargetWeightsTask(object):
         cm = np.ones(cm_shape) * default_weight
         # Add weights
         for (where, what) in funcs:
-            mask = where(coords)
-            vals = what(coords)
-            cm[mask] += vals[mask]
+            mask = where(coords) if callable(where) else (np.ones(cm.shape, dtype=bool))
+            vals = what(coords, cm) if callable(what) else (what * np.ones(cm.shape))
+            cm[mask] = vals[mask]
             
         # Add noise
         mask = np.random.random(cm.shape) < noise
