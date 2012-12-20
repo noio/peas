@@ -41,6 +41,9 @@ class TargetWeightsTask(object):
         random_weights = np.random.random(cm.shape) * max_weight * 2 - max_weight
         cm[mask] = random_weights[mask]
         self.target = cm.reshape(np.product(substrate_shape), np.product(substrate_shape))
+        
+        # Clip
+        self.target = np.clip(self.target, -max_weight, max_weight)
                         
     def evaluate(self, network):
         if not isinstance(network, NeuralNetwork):
