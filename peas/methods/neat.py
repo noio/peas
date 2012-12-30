@@ -130,8 +130,14 @@ class NEATGenotype(object):
             # If an initial topology is given, use that:
             fr, to = zip(*topology)
             maxnode = max(max(fr), max(to))
+
+            if maxnode + 1 < inputs + outputs:
+                raise Exception("Topology (%d) contains fewer than inputs (%d) + outputs (%d) nodes." % 
+                    (maxnode, inputs, outputs))
+                
             for i in xrange(maxnode+1):
-                self.node_genes.append( [i * 1024.0, random.choice(self.types), 0.0, self.response_default, i + 1] )
+                layer = 0 if i < inputs else i + 1
+                self.node_genes.append( [i * 1024.0, random.choice(self.types), 0.0, self.response_default, layer] )
             innov = 0
             for fr, to in topology:
                 self.conn_genes[(fr, to)] = [innov, fr, to, np.random.normal(0.0, self.initial_weight_stdev), True]

@@ -8,6 +8,7 @@ import os
 
 # Libraries
 import numpy as np
+from numpy.linalg import lstsq
 import scipy.misc
 from PIL import Image
 
@@ -29,6 +30,7 @@ class TargetWeightsTask(object):
         # Build the connectivity matrix coords system
         cm_shape = list(substrate_shape) + list(substrate_shape)
         coords = np.mgrid[[slice(-1, 1, s*1j) for s in cm_shape]]
+        self.locs =  coords.transpose(range(1,len(cm_shape)+1) + [0]).reshape(-1, len(cm_shape))
         cm = np.ones(cm_shape) * default_weight
         # Add weights
         for (where, what) in funcs:
@@ -52,10 +54,26 @@ class TargetWeightsTask(object):
         if network.cm.shape != self.target.shape:
             raise Exception("Network shape (%s) does not match target shape (%s)." % 
                 (network.cm.shape, self.target.shape))
-        err = np.abs(network.cm - self.target)
-        score = ((2 * self.max_weight) - err).mean()
-        correct = (err < (self.max_weight / 10.0)).mean()
-        return {'fitness': 2**score, 'error':err.mean(), 'correct':correct}
+
+        diff = np.abs(network.cm - self.target)
+        err  = ((network.cm - self.target) ** 2).sum()
+        x, res, _, _ = lstsq(self.locs, self.target.flat)
+        res = res[0]
+        diff_lsq = np.abs(np.dot(self.locs, x) - self.target.flat)
+        diff_nonlin = diff_lsq.mean() - diff.mean()
+        
+        score = ((2 * self.max_weight) - diff).mean()
+        correct = (diff < (self.max_weight / 10.0)).mean()
+        nonlinear = res - err
+
+        return {'fitness': 2**score, 
+                'error':err, 
+                'diff':diff.mean(),
+                'diff_lsq':diff_lsq.mean(),
+                'correct':correct, 
+                'err_nonlin':nonlinear, 
+                'diff_nonlin': diff_nonlin,
+                'residue':res}
         
     def solve(self, network):
         return self.evaluate(network)['correct'] > 0.8
