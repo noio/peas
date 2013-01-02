@@ -20,11 +20,12 @@ from ..networks.rnn import NeuralNetwork
 class TargetWeightsTask(object):
     
     def __init__(self, default_weight=0, substrate_shape=(3,3), noise=0, max_weight=3.0,
-                funcs=[] 
+                funcs=[], fitnessmeasure='absdiff'
                 ):
         # Instance vars
         self.substrate_shape = substrate_shape
         self.max_weight      = max_weight
+        self.fitnessmeasure  = fitnessmeasure
         if not (0 <= noise <= 1):
             raise Exception("Noise value has to be between 0 and 1.")
         # Build the connectivity matrix coords system
@@ -62,11 +63,15 @@ class TargetWeightsTask(object):
         diff_lsq = np.abs(np.dot(self.locs, x) - self.target.flat)
         diff_nonlin = diff_lsq.mean() - diff.mean()
         
-        score = ((2 * self.max_weight) - diff).mean()
         correct = (diff < (self.max_weight / 10.0)).mean()
         nonlinear = res - err
+        
+        if self.fitnessmeasure == 'absdiff':
+            fitness = 2 ** ((2 * self.max_weight) - diff).mean()
+        elif self.fitnessmeasure == 'sqerr':
+            fitness = 1 / (1 + err)
 
-        return {'fitness': 2**score, 
+        return {'fitness': fitness, 
                 'error':err, 
                 'diff':diff.mean(),
                 'diff_lsq':diff_lsq.mean(),
