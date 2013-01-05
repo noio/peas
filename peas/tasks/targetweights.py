@@ -31,7 +31,9 @@ class TargetWeightsTask(object):
         # Build the connectivity matrix coords system
         cm_shape = list(substrate_shape) + list(substrate_shape)
         coords = np.mgrid[[slice(-1, 1, s*1j) for s in cm_shape]]
-        self.locs =  coords.transpose(range(1,len(cm_shape)+1) + [0]).reshape(-1, len(cm_shape))
+        self.locs = coords.transpose(range(1,len(cm_shape)+1) + [0]).reshape(-1, len(cm_shape))
+        self.locs = np.hstack((self.locs, np.ones((self.locs.shape[0], 1))))
+        # print self.locs
         cm = np.ones(cm_shape) * default_weight
         # Add weights
         for (where, what) in funcs:
@@ -59,6 +61,9 @@ class TargetWeightsTask(object):
         diff = np.abs(network.cm - self.target)
         err  = ((network.cm - self.target) ** 2).sum()
         x, res, _, _ = lstsq(self.locs, self.target.flat)
+        # print self.target.flatten()
+        # print res
+        # print x
         res = res[0]
         diff_lsq = np.abs(np.dot(self.locs, x) - self.target.flat)
         diff_nonlin = diff_lsq.mean() - diff.mean()
