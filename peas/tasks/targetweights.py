@@ -20,7 +20,7 @@ from ..networks.rnn import NeuralNetwork
 class TargetWeightsTask(object):
     
     def __init__(self, default_weight=0, substrate_shape=(3,3), noise=0, max_weight=3.0,
-                funcs=[], fitnessmeasure='absdiff'
+                funcs=[], fitnessmeasure='absdiff', uniquefy=False, equalize=False,
                 ):
         # Instance vars
         self.substrate_shape = substrate_shape
@@ -47,8 +47,19 @@ class TargetWeightsTask(object):
         cm[mask] = random_weights[mask]
         self.target = cm.reshape(np.product(substrate_shape), np.product(substrate_shape))
         
+        if uniquefy:
+            vals,idxs = np.unique(self.target, return_inverse=True)
+            rnd = np.random.random(vals.size) * 6. - 3.
+            self.target = rnd[idxs]
+            self.target = self.target.reshape(np.product(substrate_shape), np.product(substrate_shape))
+            
+        
         # Clip
         self.target = np.clip(self.target, -max_weight, max_weight)
+        
+        if equalize and self.target.min() < self.target.max():
+            self.target = (self.target - self.target.min()) / (self.target.max() - self.target.min())
+            self.target = (self.target - 0.5) * 2 * max_weight
                         
     def evaluate(self, network):
         if not isinstance(network, NeuralNetwork):
