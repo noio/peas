@@ -204,7 +204,7 @@ class NeuralNetwork(object):
             act = np.dot(self.cm, act)
             act = self.single_type(act)
         # All other recursive networks only activate once too, upon feeding
-        # this means that upon each feed, activation propagate by one step.
+        # this means that upon each feed, activation propagates by one step.
         else:
             act[:input_size] = input_activation.flat[:input_size]
             act = np.dot(self.cm, act)

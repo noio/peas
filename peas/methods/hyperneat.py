@@ -77,8 +77,10 @@ class Substrate(object):
         """ Connect all nodes in the from_layer to all nodes in the to_layer.
             A maximum connection length can be given to limit the number of connections,
             manhattan distance is used.
+            HyperNEAT uses the connection_id to determine which CPPN output node
+            to use for the weight.
         """
-        conns = product(self.layers[from_layer], self.layers[to_layer])
+        conns = product( self.layers[from_layer], self.layers[to_layer] )
         conns = filter(lambda (fr, to): np.all(np.abs(self.nodes[fr] - self.nodes[to]) <=  max_length), conns)
         self.connections.extend(conns)
         self.connection_ids.extend([connection_id] * len(conns))

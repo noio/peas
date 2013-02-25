@@ -4,8 +4,12 @@
 
 ### IMPORTS ###
 import random
+import copy
 
 import numpy as np
+
+### SHORTCUTS ###
+inf = float('inf')
 
 
 ### CONSTANTS ###
@@ -31,10 +35,122 @@ INVNUM = dict([(n, tuple(a[0] for a in np.nonzero(NUMBERING == n))) for n in ran
 
 ### FUNCTIONS ###
 
-def alphabeta(game, heuristic_a, heuristic_b, max_ply=4):
-    pass
+def alphabeta(node, heuristic, player_max=True, depth=4, alpha=-inf, beta=inf):
+    """ Performs alphabeta search.
+        From wikipedia pseudocode.
+    """
+    if depth == 0 or node.game_over():
+        return heuristic(node)
+    if player_max:
+        for move in node.moves():
+            alpha = max(alpha, alphabeta(node.copy_and_play(move), heuristic, not player_max, depth-1, alpha, beta))
+            if beta <= alpha:
+                break # Beta cutoff
+        return alpha
+    else:
+        for move in node.moves():
+            beta = min(beta, alphabeta(node.copy_and_play(move), heuristic, not player_max, depth-1, alpha, beta))     
+            if beta <= alpha:
+                break # Alpha cutoff
+        return beta
+
+def gamefitness(game):
+    """ Returns the fitness of
+        the black player. (according to {gauci2008case}) """
+    counts = np.bincount(game.board.flat)
+    return (100 + 2 * counts[BLACK|MAN] + 3 * counts[BLACK|KING] + 
+            2 * (12 - counts[WHITE|MAN] + 3 * (12 - counts[WHITE|KING])))
 
 ### CLASSES ###
+
+class CheckersTask(object):
+    """ Represents a checkers game played by an evolved phenotype against
+        a fixed opponent.
+    """
+    def __init__(self):
+        pass
+
+    def evaluate(self, network):
+        # Setup
+        game = Checkers()
+        player = HeuristicOpponent(NetworkHeuristic(network))
+        opponent = HeuristicOpponent(SimpleHeuristic())
+        # Play the game
+        fitness = [gamefitness(game)] * 100
+        current, next = player, opponent
+        i = 0
+        while not game.game_over():
+            i += 1
+            move = current.pickmove(game)
+            game.play(move)
+            current, next = next, current
+            fitness.pop(0)
+            fitness.append(gamefitness(game))
+        print "Game finished in %d turns." % (i,)
+        if game.to_move == WHITE:
+            fitness.append(30000)
+            print "BLACK won."
+        score = sum(fitness)
+        return {'fitness':score}
+
+    def solve(self, network):
+        return self.evaluate(network)['fitness'] > 30000
+
+    def visualize(self, network):
+        pass
+
+        
+class HeuristicOpponent(object):
+    """ Opponent that utilizes a heuristic combined with alphabeta search
+        to decide on a move.
+    """
+    def __init__(self, heuristic, search_depth=3):
+        self.search_depth = search_depth
+        self.heuristic = heuristic
+    
+    def pickmove(self, board):
+        player_max = board.to_move == BLACK
+        bestmove = None
+        bestval = -inf if player_max else inf
+        for move in board.moves():
+            val = alphabeta(board.copy_and_play(move), self.heuristic.evaluate, depth=self.search_depth, player_max=player_max)
+            if player_max and val > bestval or not player_max and val < bestval:
+                bestval = val
+                bestmove = move
+        return bestmove
+
+class SimpleHeuristic(object):
+    """ Simple piece/position counting heuristic, adapted from simplech
+    """
+    def evaluate(self, game):
+        if game.game_over():
+            return -5000 if game.to_move == BLACK else 5000
+        counts = np.bincount(game.board.flat)
+        return (counts[BLACK|MAN] + 3 * counts[BLACK|KING] - 
+                (counts[WHITE|MAN] + 3 * counts[WHITE|KING]))
+
+class NetworkHeuristic(object):
+    """ Heuristic based on feeding the board state to a neural network
+    """
+    def __init__(self, network):
+        self.network = network
+
+    def evaluate(self, board):
+        net_inputs = ((board.board == BLACK | MAN) * 1.0 +
+                      (board.board == WHITE | MAN) * -1.0 +
+                      (board.board == BLACK | KING) * 1.3 +
+                      (board.board == WHITE | KING) * -1.3)
+        # Feed twice to propagate:
+        self.network.feed(net_inputs.flatten(), add_bias=False)
+        value = self.network.feed(net_inputs.flatten(), add_bias=False)
+        # print net_inputs.sum(), value.sum(), value[-1]
+        # print value
+        return value[-1]
+
+class RandomOpponent(object):
+    """ An opponent that plays random moves """
+    def pickmove(self, board):
+        return random.choice(list(board.moves()))
 
 class Checkers(object):
     """ Represents the checkers game(state)
@@ -42,7 +158,9 @@ class Checkers(object):
 
     def __init__(self):
         """ Initialize the game board. """
-        self.board = NUMBERING.copy()
+        self.board = NUMBERING.copy() #: The board state
+        self.to_move = BLACK          #: Whose move it is
+
         tiles = self.board > 0
         self.board[tiles] = EMPTY
         self.board[:3,:] = BLACK | MAN
@@ -50,32 +168,48 @@ class Checkers(object):
         self.board[5:,:] = WHITE | MAN
         self.board[np.logical_not(tiles)] = FREE
         
-        self.to_move = BLACK
-        print NUMBERING
-        print self
-               
+        self._moves = None
+                       
     def moves(self):
         """ Return a list of possible moves. """
+        if self._moves is not None:
+            for move in self._moves:
+                yield move
+            return
         captures_possible = False
         pieces = []
         # Check for possible captures first:
         for n, (y,x) in INVNUM.iteritems():
             piece = self.board[y, x]
             if piece & self.to_move:
-                pieces.append((n, (y, x)))
+                pieces.append((n, (y, x), piece))
                 for m in self.captures((y, x), piece, self.board):
                     if len(m) > 1:
                         captures_possible = True
                         yield m
         # Otherwise check for normal moves:
         if not captures_possible:
-            for (n, (y, x)) in pieces:    
-                nextrow = y + 1 if self.to_move == BLACK else y - 1
-                if 0 <= nextrow < 8:
-                    if x - 1 >= 0 and self.board[nextrow, x - 1] == EMPTY:
-                        yield (n, NUMBERING[nextrow, x - 1])
-                    if x + 1 < 8 and self.board[nextrow, x + 1] == EMPTY:
-                        yield (n, NUMBERING[nextrow, x + 1])
+            for (n, (y, x), piece) in pieces:
+                # MAN moves
+                if piece & MAN:
+                    nextrow = y + 1 if self.to_move == BLACK else y - 1
+                    if 0 <= nextrow < 8:
+                        if x - 1 >= 0 and self.board[nextrow, x - 1] == EMPTY:
+                            yield (n, NUMBERING[nextrow, x - 1])
+                        if x + 1 < 8 and self.board[nextrow, x + 1] == EMPTY:
+                            yield (n, NUMBERING[nextrow, x + 1])
+                # KING moves
+                else:
+                    for dx in [-1, 1]:
+                        for dy in [-1, 1]:                
+                            dist = 1
+                            while True:
+                                tx, ty = x + (dist + 1) * dx, y + (dist + 1) * dy # Target square
+                                if not ((0 <= tx < 8 and 0 <= ty < 8) and self.board[ty, tx] == EMPTY):
+                                    break
+                                else:
+                                    yield (n, NUMBERING[ty, tx])
+                                dist += 1
 
     
     def captures(self, (py, px), piece, board, captured=[], start=None):
@@ -102,16 +236,16 @@ class Checkers(object):
                             ):
                             # Normal pieces cannot continue capturing after reaching last row
                             if not piece & KING and (piece & WHITE and ty == 0 or piece & BLACK and ty == 7):
-                                yield [NUMBERING[py, px], NUMBERING[ty, tx]]
+                                yield (NUMBERING[py, px], NUMBERING[ty, tx])
                             else:
                                 for sequence in self.captures((ty, tx), piece, board, captured + [(jy, jx)], start):
-                                    yield [NUMBERING[py, px]] + sequence
+                                    yield (NUMBERING[py, px],) + sequence
                         break
                     else:
                         if piece & MAN:
                             break
                     dist += 1
-        yield [NUMBERING[py, px]]
+        yield (NUMBERING[py, px],)
                         
         
     def play(self, move):
@@ -136,13 +270,34 @@ class Checkers(object):
         self.board[py, px] = piece
 
         self.to_move = WHITE if self.to_move == BLACK else BLACK
+        # Cached moveset is invalidated.
+        self._moves = None
+        return self
+
+    def copy_and_play(self, move):
+        return self.copy().play(move)
         
     def game_over(self):
         """ Whether the game is over. """
-        return not list(self.moves())
+        for move in self.moves():
+            # If the iterator returns any moves at all, the game is not over.
+            return False
+        # Otherwise it is.
+        return True
+
         
-    def evaluate(self):
+    def winner(self):
         """ Returns board score. """
+        if not self.game_over():
+            return 0.0
+        else:
+            return 1.0 if self.to_move == WHITE else -1.0
+
+    def copy(self):
+        new = copy.copy(self)               # Copy all.
+        new.board = self.board.copy()       # Copy the board explicitly
+        new._moves = copy.copy(self._moves) # Shallow copy is enough.
+        return new
 
     def __str__(self):
         s = np.array([l for l in "-    wb  WB      "])
@@ -157,18 +312,9 @@ class Checkers(object):
 ### PROCEDURE ###
 
 if __name__ == '__main__':
-    white_wins = 0
-    black_wins = 0
-    for i in range(100):
-        c = Checkers()
-        while not c.game_over():
-            picked = random.choice(list(c.moves()))
-            c.play(picked)
-        black_win = c.to_move == WHITE
-        print "BLACK wins" if black_win else "WHITE wins"
-        if black_win:
-            black_wins += 1
-        else:
-            white_wins += 1
-        print c
-        print black_wins, white_wins
+    score = 0
+    for i in range(5):
+        c = CheckersGame()
+        # score += c.play(HeuristicOpponent(SimpleHeuristic()), RandomOpponent())
+        score += c.play(RandomOpponent(), HeuristicOpponent(SimpleHeuristic()))
+    print 'Score', score
