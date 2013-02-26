@@ -104,7 +104,7 @@ class HeuristicOpponent(object):
     """ Opponent that utilizes a heuristic combined with alphabeta search
         to decide on a move.
     """
-    def __init__(self, heuristic, search_depth=3):
+    def __init__(self, heuristic, search_depth=4):
         self.search_depth = search_depth
         self.heuristic = heuristic
     
@@ -117,7 +117,7 @@ class HeuristicOpponent(object):
             if player_max and val > bestval or not player_max and val < bestval:
                 bestval = val
                 bestmove = move
-        # print bestval, bestmove
+        print bestval, bestmove
         return bestmove
 
 class SimpleHeuristic(object):
@@ -142,10 +142,9 @@ class NetworkHeuristic(object):
                       (board.board == BLACK | KING) * 1.3 +
                       (board.board == WHITE | KING) * -1.3)
         # Feed twice to propagate:
-        self.network.feed(net_inputs, add_bias=False)
         value = self.network.feed(net_inputs, add_bias=False)
         value = self.network.feed(net_inputs, add_bias=False)
-        # print net_inputs.sum(), value.sum(), value[-1]
+        value = self.network.feed(net_inputs, add_bias=False)
         # print value
         return value[-1]
 

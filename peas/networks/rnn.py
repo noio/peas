@@ -168,7 +168,6 @@ class NeuralNetwork(object):
         """ Reset activation values. """
         self.act = np.zeros(self.cm.shape[0])
         
-        
     def feed(self, input_activation, add_bias=True):
         """ Feed an input to the network, returns the entire
             activation state, you need to extract the output nodes
@@ -211,13 +210,22 @@ class NeuralNetwork(object):
             for i in xrange(len(node_types)):
                 act[i] = node_types[i](act[i])
             
+        self.act = act
+
         # Reshape the output to 2D if it was 2D
         if self.sandwich:
             return act[act.size//2:].reshape(input_shape)      
         else:
             return act.reshape(self.original_shape)
 
-        self.act = act
+    def cm_string(self):
+        print "Connectivity matrix: %s", (self.cm.shape,)
+        cp = self.cm.copy()
+        s = np.empty(cp.shape, dtype='a1')
+        s[cp == 0] = ' '
+        s[cp > 0] = '+'
+        s[cp < 0] = '-'
+        return '\n'.join([''.join(l) + '|' for l in s])
 
     
     def visualize(self, filename, inputs=3, outputs=1):

@@ -164,6 +164,7 @@ class HyperNEATDeveloper(object):
                 network.flush()
                 for _ in xrange(self.activation_steps):
                     weight = network.feed(coords)[conn_id]
+            # print conn_id, coords, (i,j), weight
             cm[j, i] = weight
         
         # Rescale the CM
