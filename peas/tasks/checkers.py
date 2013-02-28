@@ -29,6 +29,10 @@ NUMBERING = np.array([[ 4,  0,  3,  0,  2,  0,  1,  0],
                       [ 0, 24,  0, 23,  0, 22,  0, 21],
                       [28,  0, 27,  0, 26,  0, 25,  0],
                       [ 0, 32,  0, 31,  0, 30,  0, 29]])
+
+CENTER = [(2,2), (2,4), (3,3), (3,5), (4,2), (4,4), (5,3), (5,5)]
+EDGE = [(0,0), (0,2), (0,4), (0,6), (1,7), (2,0), (3,7), (4,0), (5,7), (6,0), (7,1), (7,3), (7,5), (7,7)]
+SAFEEDGE = [(0,6), (1,7), (6,0), (7,1)]
                  
 INVNUM = dict([(n, tuple(a[0] for a in np.nonzero(NUMBERING == n))) for n in range(1, NUMBERING.max() + 1)])
 
@@ -126,9 +130,138 @@ class SimpleHeuristic(object):
     def evaluate(self, game):
         if game.game_over():
             return -5000 if game.to_move == BLACK else 5000
-        counts = np.bincount(game.board.flat)
-        return (counts[BLACK|MAN] + 3 * counts[BLACK|KING] - 
-                (counts[WHITE|MAN] + 3 * counts[WHITE|KING]))
+        board = game.board
+        counts = np.bincount(board.flat)
+
+        turn = 2;     # color to move gets +turn
+        brv = 3;      # multiplier for back rank
+        kcv = 5;      # multiplier for kings in center
+        mcv = 1;      # multiplier for men in center
+        mev = 1;      # multiplier for men on edge
+        kev = 5;      # multiplier for kings on edge
+        cramp = 5;    # multiplier for cramp
+        opening = -2; # multipliers for tempo
+        midgame = -1;
+        endgame = 2;
+        intactdoublecorner = 3;
+
+        nwm = counts[WHITE|MAN]
+        nwk = counts[WHITE|KING]
+        nbm = counts[BLACK|MAN]
+        nbk = counts[BLACK|KING]
+
+        vb = (100 * nbm + 130 * nbk)
+        vw = (100 * nwm + 130 * nwk)
+        
+        val = (vb - vw) + (250 * (vb-vw))/(vb+vw); #favor exchanges if in material plus
+
+        nm = nwm + nbm
+        nk = nwk + nbk
+
+        val += turn if game.to_move == BLACK else -turn
+
+        if board[4][0] == (BLACK|MAN) and board[5][1] == (WHITE|MAN):
+            val += cramp
+        if board[3][7] == (WHITE|MAN) and board[2][6] == (BLACK|MAN):
+            val -= cramp
+
+        # Back rank guard
+        code = 0
+        if (board[0][0] & MAN): code += 1
+        if (board[0][2] & MAN): code += 2
+        if (board[0][4] & MAN): code += 4
+        if (board[0][6] & MAN): code += 8
+        if code == 1:
+            backrankb = -1
+        elif code in (0, 3, 9):
+            backrankb = 0
+        elif code in (2, 4, 5, 7, 8):
+            backrankb = 1
+        elif code in (6, 12, 13):
+            backrankb = 2
+        elif code == 11:
+            backrankb = 4
+        elif code == 10:
+            backrankb = 7
+        elif code == 15:
+            backrankb = 8
+        elif code == 14:
+            backrankb = 9
+        
+        code = 0
+        if (board[7][1] & MAN): code += 8
+        if (board[7][3] & MAN): code += 4
+        if (board[7][5] & MAN): code += 2
+        if (board[7][7] & MAN): code += 1
+
+        if code == 1:
+            backrankw = -1
+        elif code in (0, 3, 9):
+            backrankw = 0
+        elif code in (2, 4, 5, 7, 8):
+            backrankw = 1
+        elif code in (6, 12, 13):
+            backrankw = 2
+        elif code == 11:
+            backrankw = 4
+        elif code == 10:
+            backrankw = 7
+        elif code == 15:
+            backrankw = 8
+        elif code == 14:
+            backrankw = 9
+        
+        val += brv * (backrankb - backrankw)
+
+        if board[0][6] == BLACK|MAN and (board[1][5] == BLACK|MAN or board[1][7] == BLACK|MAN):
+            val += intactdoublecorner
+        if board[7][1] == WHITE|MAN and (board[6][0] == WHITE|MAN or board[6][2] == WHITE|MAN):
+            val -= intactdoublecorner
+
+        bm = bk = wm = wk = 0
+        for pos in CENTER:
+            if board[pos] == BLACK|MAN: bm += 1
+            elif board[pos] == BLACK|KING: bk += 1
+            elif board[pos] == WHITE|MAN: wm += 1
+            elif board[pos] == WHITE|KING: wk += 1
+
+        val += (bm - wm) * mcv
+        val += (bk - wk) * kcv
+
+        bm = bk = wm = wk = 0
+        for pos in EDGE:
+            if board[pos] == BLACK|MAN: bm += 1
+            elif board[pos] == BLACK|KING: bk += 1
+            elif board[pos] == WHITE|MAN: wm += 1
+            elif board[pos] == WHITE|KING: wk += 1
+
+        val += (bm - wm) * mev
+        val += (bk - wk) * kev
+
+        tempo = 0
+        for i in xrange(8):
+            for j in xrange(8):
+                if board[i,j] == BLACK|MAN:
+                    tempo += i
+                elif board[i,j] == WHITE|MAN:
+                    tempo -= 7-i
+        if nm >= 16:
+            val += opening * tempo
+        if 12 <= nm <= 15:
+            val += midgame * tempo
+        if nm < 9:
+            val += endgame * tempo
+
+        for pos in SAFEEDGE:
+            if nbk + nbm > nwk + nwm and nwk < 3:
+                if board[pos] == (WHITE|KING):
+                    val -= 15
+            
+            if nwk + nwm > nbk + nbm and nbk < 3:
+                if board[pos] == (BLACK|KING):
+                    val += 15
+
+        return val
 
 class NetworkHeuristic(object):
     """ Heuristic based on feeding the board state to a neural network
@@ -137,10 +270,13 @@ class NetworkHeuristic(object):
         self.network = network
 
     def evaluate(self, board):
-        net_inputs = ((board.board == BLACK | MAN) * 1.0 +
-                      (board.board == WHITE | MAN) * -1.0 +
-                      (board.board == BLACK | KING) * 1.3 +
-                      (board.board == WHITE | KING) * -1.3)
+        if game.game_over():
+            return -5000 if game.to_move == BLACK else 5000
+
+        net_inputs = ((board.board == BLACK | MAN) * 0.5 +
+                      (board.board == WHITE | MAN) * -0.5 +
+                      (board.board == BLACK | KING) * 0.75 +
+                      (board.board == WHITE | KING) * -0.75)
         # Feed twice to propagate:
         value = self.network.feed(net_inputs, add_bias=False)
         value = self.network.feed(net_inputs, add_bias=False)
@@ -313,9 +449,18 @@ class Checkers(object):
 ### PROCEDURE ###
 
 if __name__ == '__main__':
-    score = 0
+    scores = []
     for i in range(5):
-        c = CheckersGame()
-        # score += c.play(HeuristicOpponent(SimpleHeuristic()), RandomOpponent())
-        score += c.play(RandomOpponent(), HeuristicOpponent(SimpleHeuristic()))
-    print 'Score', score
+        game = Checkers()
+        player = RandomOpponent()
+        opponent = HeuristicOpponent(SimpleHeuristic())
+        # Play the game
+        current, next = player, opponent
+        i = 0
+        while not game.game_over():
+            i += 1
+            move = current.pickmove(game)
+            game.play(move)
+            current, next = next, current
+        scores.append(gamefitness(game))
+    print 'Score', scores
