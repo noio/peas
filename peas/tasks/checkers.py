@@ -108,7 +108,7 @@ class HeuristicOpponent(object):
     """ Opponent that utilizes a heuristic combined with alphabeta search
         to decide on a move.
     """
-    def __init__(self, heuristic, search_depth=4):
+    def __init__(self, heuristic, search_depth=3):
         self.search_depth = search_depth
         self.heuristic = heuristic
     
@@ -121,7 +121,7 @@ class HeuristicOpponent(object):
             if player_max and val > bestval or not player_max and val < bestval:
                 bestval = val
                 bestmove = move
-        print bestval, bestmove
+        # print bestval, bestmove
         return bestmove
 
 class SimpleHeuristic(object):
@@ -269,14 +269,14 @@ class NetworkHeuristic(object):
     def __init__(self, network):
         self.network = network
 
-    def evaluate(self, board):
+    def evaluate(self, game):
         if game.game_over():
             return -5000 if game.to_move == BLACK else 5000
 
-        net_inputs = ((board.board == BLACK | MAN) * 0.5 +
-                      (board.board == WHITE | MAN) * -0.5 +
-                      (board.board == BLACK | KING) * 0.75 +
-                      (board.board == WHITE | KING) * -0.75)
+        net_inputs = ((game.board == BLACK | MAN) * 0.5 +
+                      (game.board == WHITE | MAN) * -0.5 +
+                      (game.board == BLACK | KING) * 0.75 +
+                      (game.board == WHITE | KING) * -0.75)
         # Feed twice to propagate:
         value = self.network.feed(net_inputs, add_bias=False)
         value = self.network.feed(net_inputs, add_bias=False)
@@ -286,8 +286,8 @@ class NetworkHeuristic(object):
 
 class RandomOpponent(object):
     """ An opponent that plays random moves """
-    def pickmove(self, board):
-        return random.choice(list(board.moves()))
+    def pickmove(self, game):
+        return random.choice(list(game.moves()))
 
 class Checkers(object):
     """ Represents the checkers game(state)
