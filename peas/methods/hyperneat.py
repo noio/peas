@@ -28,6 +28,7 @@ class Substrate(object):
             vectors.
         """
         self.nodes = None
+        self.is_input = []
         self.num_nodes = 0
         self.layers = {}
         self.connections = []
@@ -38,7 +39,7 @@ class Substrate(object):
             self.add_connections('a', 'a')
             
                     
-    def add_nodes(self, nodes_or_shape, layer_id='a'):
+    def add_nodes(self, nodes_or_shape, layer_id='a', is_input=False):
         """ Add the given nodes (list) or shape (tuple)
             and assign the given id/name.
         """
@@ -109,6 +110,7 @@ class HyperNEATDeveloper(object):
     
     def __init__(self, substrate,
                  sandwich=False,
+                 feedforward=False,
                  add_deltas=False,
                  weight_range=3.0,
                  min_weight=0.3,
@@ -120,10 +122,12 @@ class HyperNEATDeveloper(object):
             :param weight_range:   (min, max) of substrate weights
             :param min_weight:     The minimum CPPN output value that will lead to an expressed connection.
             :param sandwich:       Whether to turn the output net into a sandwich network.
+            :param feedforward:       Whether to turn the output net into a feedforward network.
             :param node_type:      What node type to assign to the output nodes.
         """
         self.substrate             = substrate
         self.sandwich              = sandwich
+        self.feedforward           = feedforward
         self.add_deltas            = add_deltas
         self.weight_range          = weight_range
         self.min_weight            = min_weight
@@ -178,6 +182,9 @@ class HyperNEATDeveloper(object):
         
         if self.sandwich:
             net.make_sandwich()
+
+        if self.feedforward:
+            net.make_feedforward()
             
         if not np.all(np.isfinite(net.cm)):
             raise Exception("Network contains NaN/inf weights.")

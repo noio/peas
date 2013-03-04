@@ -95,7 +95,8 @@ class WaveletDeveloper(object):
                        min_weight=0.3,
                        weight_range=3.0,
                        node_type='tanh',
-                       sandwich=False):
+                       sandwich=False,
+                       feedforward=False):
         # Fields
         self.substrate    = substrate
         self.add_deltas   = add_deltas
@@ -126,6 +127,9 @@ class WaveletDeveloper(object):
         
         if self.sandwich:
             net.make_sandwich()
+
+        if self.feedforward:
+            net.make_feedforward()
 
         return net
         

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
     Module implements a checkers game with alphabeta search and input for a heuristic
 """
@@ -5,6 +6,9 @@
 ### IMPORTS ###
 import random
 import copy
+import time
+
+from collections import defaultdict
 
 import numpy as np
 
@@ -38,23 +42,45 @@ INVNUM = dict([(n, tuple(a[0] for a in np.nonzero(NUMBERING == n))) for n in ran
 
 
 ### FUNCTIONS ###
-
-def alphabeta(node, heuristic, player_max=True, depth=4, alpha=-inf, beta=inf):
+num_evals = 0
+def alphabeta(node, heuristic, player_max=True, depth=4, alpha=-inf, beta=inf, killer_moves=defaultdict(set)):
     """ Performs alphabeta search.
         From wikipedia pseudocode.
     """
     if depth == 0 or node.game_over():
+        global num_evals
+        num_evals += 1
         return heuristic(node)
+    pmx = not player_max
+
+    killers = killer_moves[node.turn+1]
+    moves = node.all_moves()
+    m = []
+    for move in moves:
+        if move in killers:
+            m.insert(0, move)
+        else:
+            m.append(move)
+    moves = m
+    
     if player_max:
-        for move in node.moves():
-            alpha = max(alpha, alphabeta(node.copy_and_play(move), heuristic, not player_max, depth-1, alpha, beta))
+        for move in moves:
+            newnode = node.copy_and_play(move)
+            alpha = max(alpha, alphabeta(newnode, heuristic, pmx, depth-1, alpha, beta, killer_moves))
             if beta <= alpha:
+                if len(killers) > 4:
+                    killers.pop()
+                killers.add(move)
                 break # Beta cutoff
         return alpha
     else:
-        for move in node.moves():
-            beta = min(beta, alphabeta(node.copy_and_play(move), heuristic, not player_max, depth-1, alpha, beta))     
+        for move in moves:
+            newnode = node.copy_and_play(move)
+            beta = min(beta, alphabeta(newnode, heuristic, pmx, depth-1, alpha, beta, killer_moves))     
             if beta <= alpha:
+                if len(killers) > 4:
+                    killers.pop()
+                killers.add(move)
                 break # Alpha cutoff
         return beta
 
@@ -108,20 +134,31 @@ class HeuristicOpponent(object):
     """ Opponent that utilizes a heuristic combined with alphabeta search
         to decide on a move.
     """
-    def __init__(self, heuristic, search_depth=3):
+    def __init__(self, heuristic, search_depth=4, handicap=0.0):
         self.search_depth = search_depth
         self.heuristic = heuristic
+        self.handicap = handicap
+        self.killer_moves = defaultdict(set)
     
     def pickmove(self, board):
         player_max = board.to_move == BLACK
         bestmove = None
+        secondbest = None
         bestval = -inf if player_max else inf
-        for move in board.moves():
-            val = alphabeta(board.copy_and_play(move), self.heuristic.evaluate, depth=self.search_depth, player_max=player_max)
+        moves = list(board.all_moves())
+        # If there is only one possible move, don't search, just move.
+        if len(moves) == 1:
+            return moves[0]
+        for move in moves:
+            val = alphabeta(board.copy_and_play(move), self.heuristic.evaluate, 
+                depth=self.search_depth, player_max=player_max, killer_moves=self.killer_moves)
             if player_max and val > bestval or not player_max and val < bestval:
                 bestval = val
+                secondbest = bestmove
                 bestmove = move
-        # print bestval, bestmove
+        # Pick second best move
+        if secondbest is not None and self.handicap > 0 and random.random() < self.handicap:
+            return secondbest
         return bestmove
 
 class SimpleHeuristic(object):
@@ -261,7 +298,55 @@ class SimpleHeuristic(object):
                 if board[pos] == (BLACK|KING):
                     val += 15
 
+        # I have no idea what this last bit does.. :(
+        stonesinsystem = 0
+        if nwm + nwk - nbk - nbm == 0:
+            if game.to_move == BLACK:
+                for row in xrange(0, 8, 2):
+                    for c in xrange(0, 8, 2):
+                        if board[row,c] != FREE:
+                            stonesinsystem += 1
+                if stonesinsystem % 2:
+                    if nm + nk <= 12: val += 1
+                    if nm + nk <= 10: val += 1
+                    if nm + nk <= 8: val += 2
+                    if nm + nk <= 6: val += 2
+                else:
+                    if nm + nk <= 12: val -= 1
+                    if nm + nk <= 10: val -= 1
+                    if nm + nk <= 8: val -= 2
+                    if nm + nk <= 6: val -= 2
+            else:
+                for row in xrange(1, 8, 2):
+                    for c in xrange(1, 8, 2):
+                        if board[row,c] != FREE:
+                            stonesinsystem += 1
+                if stonesinsystem % 2:
+                    if nm + nk <= 12: val += 1
+                    if nm + nk <= 10: val += 1
+                    if nm + nk <= 8: val += 2
+                    if nm + nk <= 6: val += 2
+                else:
+                    if nm + nk <= 12: val -= 1
+                    if nm + nk <= 10: val -= 1
+                    if nm + nk <= 8: val -= 2
+                    if nm + nk <= 6: val -= 2
+
         return val
+
+class PieceCounter(object):
+    def evaluate(self, game):
+        counts = np.bincount(game.board.flat)
+
+        nwm = counts[WHITE|MAN]
+        nwk = counts[WHITE|KING]
+        nbm = counts[BLACK|MAN]
+        nbk = counts[BLACK|KING]
+
+        vb = (100 * nbm + 130 * nbk)
+        vw = (100 * nwm + 130 * nwk)
+
+        return vb - vw
 
 class NetworkHeuristic(object):
     """ Heuristic based on feeding the board state to a neural network
@@ -277,17 +362,15 @@ class NetworkHeuristic(object):
                       (game.board == WHITE | MAN) * -0.5 +
                       (game.board == BLACK | KING) * 0.75 +
                       (game.board == WHITE | KING) * -0.75)
-        # Feed twice to propagate:
-        value = self.network.feed(net_inputs, add_bias=False)
-        value = self.network.feed(net_inputs, add_bias=False)
-        value = self.network.feed(net_inputs, add_bias=False)
+        # Feed twice to propagate through 3 layer network:
+        value = self.network.feed(net_inputs, add_bias=False, propagate=2)
         # print value
         return value[-1]
 
 class RandomOpponent(object):
     """ An opponent that plays random moves """
     def pickmove(self, game):
-        return random.choice(list(game.moves()))
+        return random.choice(list(game.all_moves()))
 
 class Checkers(object):
     """ Represents the checkers game(state)
@@ -297,6 +380,7 @@ class Checkers(object):
         """ Initialize the game board. """
         self.board = NUMBERING.copy() #: The board state
         self.to_move = BLACK          #: Whose move it is
+        self.turn = 0
 
         tiles = self.board > 0
         self.board[tiles] = EMPTY
@@ -306,13 +390,14 @@ class Checkers(object):
         self.board[np.logical_not(tiles)] = FREE
         
         self._moves = None
+
+    def all_moves(self):
+        if self._moves is None:
+            self._moves = list(self.generate_moves())
+        return self._moves
                        
-    def moves(self):
+    def generate_moves(self):
         """ Return a list of possible moves. """
-        if self._moves is not None:
-            for move in self._moves:
-                yield move
-            return
         captures_possible = False
         pieces = []
         # Check for possible captures first:
@@ -350,7 +435,15 @@ class Checkers(object):
 
     
     def captures(self, (py, px), piece, board, captured=[], start=None):
-        """ Return a list of possible capture moves for given piece. """
+        """ Return a list of possible capture moves for given piece in a 
+            checkers game. 
+
+            :param (py, px): location of piece on the board
+            :param piece: piece type (BLACK/WHITE|MAN/KING)
+            :param board: the 2D board matrix
+            :param captured: list of already-captured pieces (can't jump twice)
+            :param start: from where this capture chain started.
+            """
         if start is None:
             start = (py, px)
         # Look for capture moves
@@ -358,12 +451,14 @@ class Checkers(object):
             for dy in [-1, 1]:
                 dist = 1 
                 while True:
-                    jx, jy = px + dist * dx, py + dist * dy # Jumped square
+                    jx = px + dist * dx # Jumped square
+                    jy = py + dist * dy 
                     # Check if piece at jx, jy:
                     if not (0 <= jx < 8 and 0 <= jy < 8):
                         break
                     if board[jy, jx] != EMPTY:
-                        tx, ty = px + (dist + 1) * dx, py + (dist + 1) * dy # Target square
+                        tx = px + (dist + 1) * dx # Target square
+                        ty = py + (dist + 1) * dy 
                         # Check if it can be captured:
                         if ((0 <= tx < 8 and 0 <= ty < 8) and
                             ((ty, tx) == start or board[ty, tx] == EMPTY) and
@@ -407,6 +502,7 @@ class Checkers(object):
         self.board[py, px] = piece
 
         self.to_move = WHITE if self.to_move == BLACK else BLACK
+        self.turn += 1
         # Cached moveset is invalidated.
         self._moves = None
         return self
@@ -416,7 +512,7 @@ class Checkers(object):
         
     def game_over(self):
         """ Whether the game is over. """
-        for move in self.moves():
+        for move in self.all_moves():
             # If the iterator returns any moves at all, the game is not over.
             return False
         # Otherwise it is.
@@ -450,10 +546,13 @@ class Checkers(object):
 
 if __name__ == '__main__':
     scores = []
-    for i in range(5):
+    n = 3
+    tic = time.time()
+    for i in range(n):
         game = Checkers()
-        player = RandomOpponent()
-        opponent = HeuristicOpponent(SimpleHeuristic())
+        player = HeuristicOpponent(SimpleHeuristic())
+        # opponent = HeuristicOpponent(PieceCounter())
+        opponent = RandomOpponent()
         # Play the game
         current, next = player, opponent
         i = 0
@@ -463,4 +562,6 @@ if __name__ == '__main__':
             game.play(move)
             current, next = next, current
         scores.append(gamefitness(game))
+    print (time.time() - tic) / n
+    print 'Evals: %d' % (num_evals / n)
     print 'Score', scores

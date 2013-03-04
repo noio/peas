@@ -168,7 +168,7 @@ class NeuralNetwork(object):
         """ Reset activation values. """
         self.act = np.zeros(self.cm.shape[0])
         
-    def feed(self, input_activation, add_bias=True):
+    def feed(self, input_activation, add_bias=True, propagate=1):
         """ Feed an input to the network, returns the entire
             activation state, you need to extract the output nodes
             manually.
@@ -205,11 +205,12 @@ class NeuralNetwork(object):
         # All other recursive networks only activate once too, upon feeding
         # this means that upon each feed, activation propagates by one step.
         else:
-            act[:input_size] = input_activation.flat[:input_size]
-            act = np.dot(self.cm, act)
-            for i in xrange(len(node_types)):
-                act[i] = node_types[i](act[i])
-            
+            for _ in xrange(propagate):
+                act[:input_size] = input_activation.flat[:input_size]
+                act = np.dot(self.cm, act)
+                for i in xrange(len(node_types)):
+                    act[i] = node_types[i](act[i])
+                
         self.act = act
 
         # Reshape the output to 2D if it was 2D
