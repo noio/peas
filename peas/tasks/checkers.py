@@ -446,25 +446,25 @@ class Checkers(object):
             """
         if start is None:
             start = (py, px)
+        opponent = BLACK if piece & WHITE else WHITE
         # Look for capture moves
         for dx in [-1, 1]:
             for dy in [-1, 1]:
-                dist = 1 
+                jx, jy = px, py
                 while True:
-                    jx = px + dist * dx # Jumped square
-                    jy = py + dist * dy 
+                    jx += dx # Jumped square
+                    jy += dy 
                     # Check if piece at jx, jy:
                     if not (0 <= jx < 8 and 0 <= jy < 8):
                         break
                     if board[jy, jx] != EMPTY:
-                        tx = px + (dist + 1) * dx # Target square
-                        ty = py + (dist + 1) * dy 
+                        tx = jx + dx # Target square
+                        ty = jy + dy 
                         # Check if it can be captured:
                         if ((0 <= tx < 8 and 0 <= ty < 8) and
                             ((ty, tx) == start or board[ty, tx] == EMPTY) and
                             (jy, jx) not in captured and
-                            ((piece & WHITE) and (board[jy, jx] & BLACK) or
-                             (piece & BLACK) and (board[jy, jx] & WHITE))
+                            (board[jy, jx] & opponent)
                             ):
                             # Normal pieces cannot continue capturing after reaching last row
                             if not piece & KING and (piece & WHITE and ty == 0 or piece & BLACK and ty == 7):
@@ -476,7 +476,6 @@ class Checkers(object):
                     else:
                         if piece & MAN:
                             break
-                    dist += 1
         yield (NUMBERING[py, px],)
                         
         
