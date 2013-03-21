@@ -44,7 +44,8 @@ class SimplePopulation(object):
                        elitism = True,
                        stop_when_solved=False, 
                        tournament_selection_k=3,
-                       verbose=True):
+                       verbose=True,
+                       max_cores=1):
         # Instance properties
         self.geno_factory           = geno_factory
         self.popsize                = popsize
@@ -52,6 +53,7 @@ class SimplePopulation(object):
         self.stop_when_solved       = stop_when_solved
         self.tournament_selection_k = tournament_selection_k
         self.verbose                = verbose
+        self.max_cores              = max_cores
         
     def _reset(self):
         """ Resets the state of this population.
@@ -118,8 +120,16 @@ class SimplePopulation(object):
         """ Evaluates all of the individuals in given pop,
             and assigns their "stats" property.
         """
+        to_eval = [(individual, evaluator) for individual in pop]
         cpus = multiprocessing.cpu_count()
-        pop = map(evaluate_individual, ((individual, evaluator) for individual in pop))
+        use_cores = min(self.max_cores, cpus)
+        if use_cores > 1:
+            print "Running in %d processes." % use_cores
+            pool = multiprocessing.Pool(processes=use_cores)
+            pop = pool.map(evaluate_individual, to_eval)
+        else:
+            print "Running in single process."
+            pop = map(evaluate_individual, to_eval)
         
         return pop
     

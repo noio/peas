@@ -392,23 +392,18 @@ class NEATPopulation(SimplePopulation):
         and reproduction methods.
     """
     
-    def __init__(self, 
-                 geno_factory,
-                 popsize=100,
+    def __init__(self, geno_factory,
                  compatibility_threshold=3.0,
                  compatibility_threshold_delta=0.4,
                  target_species=12,
                  reset_innovations=False,
                  survival=0.2,
-                 elitism=True,
-                 tournament_selection_k=3,
                  young_age=10,
                  young_multiplier=1.2,
                  old_age=30,
                  old_multiplier=0.2,
                  stagnation_age=15,
-                 stop_when_solved=False,
-                 verbose=True):
+                 **kwargs):
         """ Initializes the object with settings,
             does not create a population yet.
             
@@ -416,23 +411,19 @@ class NEATPopulation(SimplePopulation):
                                  a new instance of a genotype.
 
         """
-        self.geno_factory                  = geno_factory
-        self.popsize                       = popsize
+        super(NEATPopulation, self).__init__(geno_factory, **kwargs)
+
         self.compatibility_threshold       = compatibility_threshold
         self.compatibility_threshold_delta = compatibility_threshold_delta
         self.target_species                = target_species
         self.reset_innovations             = reset_innovations
         self.survival                      = survival
-        self.elitism                       = elitism
-        self.tournament_selection_k        = tournament_selection_k
         self.young_age                     = young_age
         self.young_multiplier              = young_multiplier
         self.old_age                       = old_age
         self.old_multiplier                = old_multiplier
         self.stagnation_age                = stagnation_age
-        self.stop_when_solved              = stop_when_solved
-        self.verbose                       = verbose
-        
+
 
     def _reset(self):
         """ Resets the state of this population.
