@@ -109,6 +109,7 @@ class CheckersTask(object):
         fitness = [gamefitness(game)] * 100
         current, next = player, opponent
         i = 0
+        print "Running checkers game..."
         while not game.game_over():
             i += 1
             move = current.pickmove(game)
