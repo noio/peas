@@ -122,7 +122,7 @@ class SimplePopulation(object):
         """
         to_eval = [(individual, evaluator) for individual in pop]
         cpus = multiprocessing.cpu_count()
-        use_cores = min(self.max_cores, cpus)
+        use_cores = min(self.max_cores, cpus-1)
         if use_cores > 1:
             print "Running in %d processes." % use_cores
             pool = multiprocessing.Pool(processes=use_cores)

@@ -8,10 +8,6 @@ import numpy as np
 np.seterr(over='warn', divide='raise')
 
 # Libraries
-try:
-    import neat.chromosome
-except ImportError:
-    pass
 
 # Local
 
@@ -89,6 +85,8 @@ class NeuralNetwork(object):
             representation.
         """
         # Typecheck
+        import neat.chromosome
+        
         if not isinstance(chromosome, neat.chromosome.Chromosome):
             raise Exception("Input should be a NEAT chromosome, is %r." % (chromosome))
         # Sort nodes: BIAS, INPUT, HIDDEN, OUTPUT, with HIDDEN sorted by feed-forward.
