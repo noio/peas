@@ -133,15 +133,12 @@ class NeuralNetwork(object):
         self.original_shape = None
         
         if source is not None:
-            if isinstance(source, neat.chromosome.Chromosome):
-                self.from_neatchromosome(source)
-            else:
-                try:
-                    self.from_matrix(*source.get_network_data())
-                    if hasattr(source, 'feedforward') and source.feedforward:
-                        self.make_feedforward()
-                except AttributeError:
-                    raise Exception("Cannot convert from %s to %s" % (source.__class__, self.__class__))
+            try:
+                self.from_matrix(*source.get_network_data())
+                if hasattr(source, 'feedforward') and source.feedforward:
+                    self.make_feedforward()
+            except AttributeError:
+                raise Exception("Cannot convert from %s to %s" % (source.__class__, self.__class__))
 
     def make_sandwich(self):
         """ Turns the network into a sandwich network,
