@@ -104,6 +104,7 @@ class WaveletDeveloper(object):
         self.weight_range = weight_range
         self.node_type    = node_type
         self.sandwich     = sandwich
+        self.feedforward  = feedforward
         
     
     def convert(self, individual):
