@@ -112,9 +112,11 @@ class LineFollowingTask(object):
                        friction_scale=0.2, 
                        motor_torque=6,
                        damping=0.2,
-                       initial_pos=None):
+                       initial_pos=None,
+                       flush_each_step=False):
         # Settings
         self.max_steps = max_steps
+        self.flush_each_step = flush_each_step
         self.fieldpath = os.path.join(DATA_DIR,field) + '.png'
         self.observationpath = os.path.join(DATA_DIR,observation) + '.png'
         print "Using %s" % (self.fieldpath,)
@@ -171,6 +173,8 @@ class LineFollowingTask(object):
             # The nodes used for output are somewhere in the middle of the network
             # so we extract them using -4 and -6
             action = network.feed(net_input)[[-4,-6]]
+            if self.flush_each_step:
+                network.flush()
 
             robot.drive(*action)
             robot.apply_friction()
