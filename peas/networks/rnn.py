@@ -38,7 +38,14 @@ def sigmoid(x):
         True
     """
     return 1 / (1 + np.exp(-x))
-    
+
+def sigmoid2(x):
+    """ Sigmoid function. 
+        >>> s = sigmoid( np.linspace(-3, 3, 10) )
+        >>> s[0] < 0.05 and s[-1] > 0.95
+        True
+    """
+    return 1 / (1 + np.exp(-4.9*x))
 
 ### CONSTANTS ###
 
@@ -51,6 +58,7 @@ ACTIVATION_FUNCS = {
     'bound': bound,
     'gauss': gauss,
     'sigmoid': sigmoid,
+    'sigmoid2': sigmoid2,
     'exp': sigmoid,
     'tanh': np.tanh,
     None : ident

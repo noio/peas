@@ -45,7 +45,9 @@ class NEATGenotype(object):
                  prob_add_node=0.03,
                  prob_add_conn=0.3,
                  prob_mutate_weight=0.8,
+                 prob_reset_weight=0.1,
                  prob_reenable_conn=0.01,
+                 prob_reenable_parent=0.25,
                  prob_mutate_bias=0.2,
                  prob_mutate_response=0.0,
                  prob_mutate_type=0.2,
@@ -79,7 +81,9 @@ class NEATGenotype(object):
         self.prob_add_conn        = prob_add_conn
         self.prob_add_node        = prob_add_node
         self.prob_mutate_weight   = prob_mutate_weight
+        self.prob_reset_weight    = prob_reset_weight      
         self.prob_reenable_conn   = prob_reenable_conn
+        self.prob_reenable_parent = prob_reenable_parent
         self.prob_mutate_bias     = prob_mutate_bias
         self.prob_mutate_response = prob_mutate_response
         self.prob_mutate_type     = prob_mutate_type
@@ -90,6 +94,7 @@ class NEATGenotype(object):
         self.stdev_mutate_response = stdev_mutate_response
         self.weight_range          = weight_range
         
+        # Species distance measure
         self.distance_excess   = distance_excess
         self.distance_disjoint = distance_disjoint
         self.distance_weight   = distance_weight
@@ -136,6 +141,8 @@ class NEATGenotype(object):
                     (maxnode, inputs, outputs))
                 
             for i in xrange(maxnode+1):
+                # Assign layer 0 to input nodes, otherwise just an incrementing number,
+                # i.e. each node is on its own layer.
                 layer = 0 if i < inputs else i + 1
                 self.node_genes.append( [i * 1024.0, random.choice(self.types), 0.0, self.response_default, layer] )
             innov = 0
@@ -219,6 +226,9 @@ class NEATGenotype(object):
                 if rand() < self.prob_mutate_weight:
                     cg[3] += np.random.normal(0, self.stdev_mutate_weight)
                     cg[3] = np.clip(cg[3], self.weight_range[0], self.weight_range[1])
+
+                if rand() < self.prob_reset_weight:
+                    cg[3] = np.random.normal(0, self.stdev_mutate_weight)
                     
                 if rand() < self.prob_reenable_conn:
                     cg[4] = True
@@ -271,13 +281,16 @@ class NEATGenotype(object):
             cg = None
             if i in self_conns and i in other_conns:
                 cg = random.choice((self_conns[i], other_conns[i]))
+                enabled = self_conns[i][4] and other_conns[i][4]
             else:
                 if i in self_conns:
                     cg = self_conns[i]
                 elif i in other_conns:
                     cg = other_conns[i]
+                enabled = cg[4]
             if cg is not None:
                 child.conn_genes[(cg[1], cg[2])] = deepcopy(cg)
+                child.conn_genes[(cg[1], cg[2])][4] = enabled or rand() < self.prob_reenable_parent
 
         # Filter out connections that would become recursive in the new individual.
         def is_feedforward(((fr, to), cg)):
@@ -376,16 +389,15 @@ class NEATGenotype(object):
 class NEATSpecies(object):
     
     def __init__(self, initial_member):
-        self.members            = [initial_member]
-        self.representative     = initial_member
-        self.offspring          = 0
-        self.age                = 0
-        self.avg_fitness        = 0.
-        self.max_fitness        = 0.
-        self.max_fitness_prev   = 0.
+        self.members = [initial_member]
+        self.representative = initial_member
+        self.offspring = 0
+        self.age = 0
+        self.avg_fitness = 0.
+        self.max_fitness = 0.
+        self.max_fitness_prev = 0.
         self.no_improvement_age = 0
-        self.has_best           = False
-                
+        self.has_best = False
         
 class NEATPopulation(SimplePopulation):
     """ A population object for NEAT, it contains the selection
@@ -403,6 +415,7 @@ class NEATPopulation(SimplePopulation):
                  old_age=30,
                  old_multiplier=0.2,
                  stagnation_age=15,
+                 min_elitism_size=5,
                  **kwargs):
         """ Initializes the object with settings,
             does not create a population yet.
@@ -413,29 +426,30 @@ class NEATPopulation(SimplePopulation):
         """
         super(NEATPopulation, self).__init__(geno_factory, **kwargs)
 
-        self.compatibility_threshold       = compatibility_threshold
+        self.compatibility_threshold = compatibility_threshold
         self.compatibility_threshold_delta = compatibility_threshold_delta
-        self.target_species                = target_species
-        self.reset_innovations             = reset_innovations
-        self.survival                      = survival
-        self.young_age                     = young_age
-        self.young_multiplier              = young_multiplier
-        self.old_age                       = old_age
-        self.old_multiplier                = old_multiplier
-        self.stagnation_age                = stagnation_age
+        self.target_species = target_species
+        self.reset_innovations = reset_innovations
+        self.survival = survival
+        self.young_age = young_age
+        self.young_multiplier = young_multiplier
+        self.old_age = old_age
+        self.old_multiplier = old_multiplier
+        self.stagnation_age = stagnation_age
+        self.min_elitism_size = min_elitism_size
 
 
     def _reset(self):
         """ Resets the state of this population.
         """
         # Keep track of some history
-        self.champions  = []
+        self.champions = []
         self.generation = 0
-        self.solved_at  = None
+        self.solved_at = None
         self.stats = defaultdict(list)
         
         # Neat specific:
-        self.species      = [] # List of species
+        self.species = [] # List of species
         self.global_innov = 0
         self.innovations = {} # Keep track of global innovations
         self.current_compatibility_threshold = self.compatibility_threshold
@@ -455,10 +469,9 @@ class NEATPopulation(SimplePopulation):
         ## INITIAL BIRTH
         while len(pop) < self.popsize:
             individual = self.geno_factory()
-            individual.neat_species = 0
             pop.append(individual)
             
-        ## EVALUATE
+        ## EVALUATE 
         pop = self._evaluate_all(pop, evaluator)
                 
         ## SPECIATE
@@ -496,8 +509,8 @@ class NEATPopulation(SimplePopulation):
         
         for specie in self.species:
             specie.max_fitness_prev = specie.max_fitness
-            specie.avg_fitness = np.mean([ind.stats['fitness'] for ind in specie.members])
-            specie.max_fitness = np.max([ind.stats['fitness'] for ind in specie.members])
+            specie.avg_fitness = np.mean( [ind.stats['fitness'] for ind in specie.members] )
+            specie.max_fitness = np.max( [ind.stats['fitness'] for ind in specie.members] )
             if specie.max_fitness <= specie.max_fitness_prev:
                 specie.no_improvement_age += 1
             else:
@@ -531,29 +544,34 @@ class NEATPopulation(SimplePopulation):
         # Produce offspring
         # Stanley says he resets the innovations each generation, but
         # neat-python keeps a global list.
+        # This switch controls which behavior to simulate.
         if self.reset_innovations:
-            self.innovations = {}
+            self.innovations = dict()
         for specie in self.species:
-            # First we keep only the best individuals
+            # First we keep only the best individuals of each species
             specie.members.sort(key=lambda ind: ind.stats['fitness'], reverse=True)
             keep = max(1, int(round(len(specie.members) * self.survival)))
-            parents = specie.members[:keep]
-            # Keep one if elitism is set
-            specie.members = specie.members[:1 if self.elitism else 0]
+            pool = specie.members[:keep]
+            # Keep one if elitism is set and the size of the species is more than
+            # that indicated in the settings
+            if self.elitism and len(specie.members) > self.min_elitism_size:
+                specie.members = specie.members[:1]
+            else:
+                specie.members = []
             # Produce offspring:
             while len(specie.members) < specie.offspring:
                 # Perform tournament selection
-                k = min(len(specie.members), self.tournament_selection_k)
-                p1 = max(random.sample(specie.members, k), key=lambda ind:ind.stats['fitness'])
-                p2 = max(random.sample(specie.members, k), key=lambda ind:ind.stats['fitness'])
+                k = min(len(pool), self.tournament_selection_k)
+                p1 = max(random.sample(pool, k), key=lambda ind: ind.stats['fitness'])
+                p2 = max(random.sample(pool, k), key=lambda ind: ind.stats['fitness'])
                 # Mate and mutate
                 child = p1.mate(p2)
                 child.mutate(innovations=self.innovations, global_innov=self.global_innov)
-                specie.members.append( child )
+                specie.members.append(child)
         
         if self.innovations:
             self.global_innov = max(self.innovations.itervalues())            
-            
+        
         self._gather_stats(pop)
         
     def _status_report(self):
