@@ -122,8 +122,10 @@ class CheckersTask(object):
             sys.stdout.flush()
             if i > 50:
                 print "Turn %d" % i
+                print game.check_draw(verbose=True)
                 print game
-        if game.to_move == WHITE:
+        print game
+        if game.winner == 1.0:
             fitness.append(30000)
         score = sum(fitness)
         print "\nGame finished in %d turns. Winner: %s. Score: %s" % (i,game.winner(), score)
@@ -500,8 +502,9 @@ class Checkers(object):
             ydir = 1 if py > ly else -1
             xdir = 1 if px > lx else -1
             for y, x in zip(xrange(ly + ydir, py, ydir),xrange(lx + xdir, px, xdir)):
-                self.board[y,x] = EMPTY
-                capture = True
+                if self.board[y,x] != EMPTY:
+                    self.board[y,x] = EMPTY
+                    capture = True
             (ly, lx) = (py, px)
         self.caphistory.append(capture)
         # Move the piece
@@ -523,13 +526,15 @@ class Checkers(object):
     def copy_and_play(self, move):
         return self.copy().play(move)
 
-    def check_draw(self):
+    def check_draw(self, verbose=False):
         # If there were no captures in the last [30] moves, draw.
-        if (len(self.caphistory) >= self.non_capture_draw and 
-            not any(self.caphistory[-self.non_capture_draw:])):
-            print self.caphistory
-            return True
-        return False
+        i = 0
+        for i in xrange(len(self.caphistory)):
+            if self.caphistory[-(i+1)]:
+                break
+        if verbose:
+            print "Last capture: %d turns ago." % (i)
+        return (i > self.non_capture_draw)
         
     def game_over(self):
         """ Whether the game is over. """
@@ -552,8 +557,8 @@ class Checkers(object):
         new = copy.copy(self)               # Copy all.
         new.board = self.board.copy()       # Copy the board explicitly
         new._moves = copy.copy(self._moves) # Shallow copy is enough.
-        new.history = copy.copy(self.history)
-        new.caphistory = copy.copy(self.caphistory)
+        new.history = self.history[:]
+        new.caphistory = self.caphistory[:]
         return new
 
     def __str__(self):
