@@ -7,6 +7,7 @@
 import random
 import copy
 import time
+import sys
 
 from collections import defaultdict
 
@@ -117,11 +118,15 @@ class CheckersTask(object):
             current, next = next, current
             fitness.pop(0)
             fitness.append(gamefitness(game))
-        print "Game finished in %d turns." % (i,)
+            sys.stdout.write('.')
+            sys.stdout.flush()
+            if i > 50:
+                print "Turn %d" % i
+                print game
         if game.to_move == WHITE:
             fitness.append(30000)
-            print "BLACK won."
         score = sum(fitness)
+        print "\nGame finished in %d turns. Winner: %s. Score: %s" % (i,game.winner(), score)
         return {'fitness':score}
 
     def solve(self, network):
@@ -377,11 +382,15 @@ class Checkers(object):
     """ Represents the checkers game(state)
     """
 
-    def __init__(self):
+    def __init__(self, non_capture_draw=30):
         """ Initialize the game board. """
+        self.non_capture_draw = non_capture_draw
+
         self.board = NUMBERING.copy() #: The board state
         self.to_move = BLACK          #: Whose move it is
         self.turn = 0
+        self.history = []
+        self.caphistory = []
 
         tiles = self.board > 0
         self.board[tiles] = EMPTY
@@ -482,15 +491,19 @@ class Checkers(object):
         
     def play(self, move):
         """ Play the given move on the board. """
+        self.history.append(move)
         positions = [INVNUM[p] for p in move]
         (ly, lx) = positions[0]
         # Check for captures
+        capture = False
         for (py, px) in positions[1:]:
             ydir = 1 if py > ly else -1
             xdir = 1 if px > lx else -1
             for y, x in zip(xrange(ly + ydir, py, ydir),xrange(lx + xdir, px, xdir)):
                 self.board[y,x] = EMPTY
+                capture = True
             (ly, lx) = (py, px)
+        self.caphistory.append(capture)
         # Move the piece
         (ly, lx) = positions[0]
         (py, px) = positions[-1]
@@ -509,19 +522,28 @@ class Checkers(object):
 
     def copy_and_play(self, move):
         return self.copy().play(move)
+
+    def check_draw(self):
+        # If there were no captures in the last [30] moves, draw.
+        if (len(self.caphistory) >= self.non_capture_draw and 
+            not any(self.caphistory[-self.non_capture_draw:])):
+            print self.caphistory
+            return True
+        return False
         
     def game_over(self):
         """ Whether the game is over. """
+        if self.check_draw():
+            return True
         for move in self.all_moves():
             # If the iterator returns any moves at all, the game is not over.
             return False
         # Otherwise it is.
         return True
-
         
     def winner(self):
         """ Returns board score. """
-        if not self.game_over():
+        if self.check_draw() or not self.game_over():
             return 0.0
         else:
             return 1.0 if self.to_move == WHITE else -1.0
@@ -530,6 +552,8 @@ class Checkers(object):
         new = copy.copy(self)               # Copy all.
         new.board = self.board.copy()       # Copy the board explicitly
         new._moves = copy.copy(self._moves) # Shallow copy is enough.
+        new.history = copy.copy(self.history)
+        new.caphistory = copy.copy(self.caphistory)
         return new
 
     def __str__(self):
