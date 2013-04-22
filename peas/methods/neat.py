@@ -285,9 +285,10 @@ class NEATGenotype(object):
             else:
                 if i in self_conns:
                     cg = self_conns[i]
+                    enabled = cg[4]
                 elif i in other_conns:
                     cg = other_conns[i]
-                enabled = cg[4]
+                    enabled = cg[4]
             if cg is not None:
                 child.conn_genes[(cg[1], cg[2])] = deepcopy(cg)
                 child.conn_genes[(cg[1], cg[2])][4] = enabled or rand() < self.prob_reenable_parent
