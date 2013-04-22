@@ -9,8 +9,6 @@ from itertools import product
 import numpy as np
 
 # Local
-
-
 sys.path.append(os.path.join(os.path.split(__file__)[0],'..','..')) 
 from peas.methods.neat import NEATPopulation, NEATGenotype
 from peas.methods.hyperneat import HyperNEATDeveloper, Substrate
