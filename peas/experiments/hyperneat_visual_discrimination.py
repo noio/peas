@@ -87,6 +87,8 @@ def run(method, setup, generations=250, popsize=100):
     return results
 
 if __name__ == '__main__':
+    # Method is one of  ['wvl', 'nhn', '0hnmax', '1hnmax']
+    # setup is one of ['big-little', 'triup-down']
 	run('nhn', 'big-little')
 	    
 
