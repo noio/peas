@@ -33,6 +33,7 @@ class Substrate(object):
         self.layers = {}
         self.connections = []
         self.connection_ids = []
+        self.linkexpression_ids = []
         # If a shape is passed, create a mesh grid of nodes.
         if nodes_or_shape is not None:
             self.add_nodes(nodes_or_shape, 'a')
@@ -74,7 +75,7 @@ class Substrate(object):
         self.nodes = np.vstack((self.nodes, newnodes))
         self.num_nodes += len(newnodes)
         
-    def add_connections(self, from_layer='a', to_layer='a', connection_id=-1, max_length=inf):
+    def add_connections(self, from_layer='a', to_layer='a', connection_id=-1, max_length=inf, link_expression_id=None):
         """ Connect all nodes in the from_layer to all nodes in the to_layer.
             A maximum connection length can be given to limit the number of connections,
             manhattan distance is used.
@@ -85,6 +86,7 @@ class Substrate(object):
         conns = filter(lambda (fr, to): np.all(np.abs(self.nodes[fr] - self.nodes[to]) <=  max_length), conns)
         self.connections.extend(conns)
         self.connection_ids.extend([connection_id] * len(conns))
+        self.linkexpression_ids.extend([link_expression_id] * len(conns))
         
     def get_connection_list(self, add_deltas):
         """ Builds the connection list only once. 
@@ -93,14 +95,14 @@ class Substrate(object):
         if not hasattr(self, '_connection_list'):
             
             self._connection_list = []
-            for ((i, j), conn_id) in izip(self.connections, self.connection_ids):
+            for ((i, j), conn_id, expr_id) in izip(self.connections, self.connection_ids, self.linkexpression_ids):
                 fr = self.nodes[i]
                 to = self.nodes[j]
                 if add_deltas:
                     conn = np.hstack((fr, to, to-fr))
                 else:
                     conn = np.hstack((fr, to))
-                self._connection_list.append(((i, j), conn, conn_id))
+                self._connection_list.append(((i, j), conn, conn_id, expr_id))
 
         return self._connection_list
 
@@ -161,15 +163,15 @@ class HyperNEATDeveloper(object):
         # Initialize connectivity matrix
         cm = np.zeros((self.substrate.num_nodes, self.substrate.num_nodes))
             
-        for (i,j), coords, conn_id in self.substrate.get_connection_list(self.add_deltas):                
-            if network.feedforward:
-                weight = network.feed(coords)[conn_id]
-            else:
+        for (i,j), coords, conn_id, expr_id in self.substrate.get_connection_list(self.add_deltas):                
+            expression = True
+            if expr_id is not None:
                 network.flush()
-                for _ in xrange(self.activation_steps):
-                    weight = network.feed(coords)[conn_id]
-            # print conn_id, coords, (i,j), weight
-            cm[j, i] = weight
+                expression = network.feed(coords, self.activation_steps)[expr_id] > 0
+            if expression:
+                network.flush()
+                weight = network.feed(coords, self.activation_steps)[conn_id]
+                cm[j, i] = weight
         
         # Rescale the CM
         cm[np.abs(cm) < self.min_weight] = 0

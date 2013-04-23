@@ -125,9 +125,9 @@ class CheckersTask(object):
                 print game.check_draw(verbose=True)
                 print game
         print game
-        if game.winner == 1.0:
-            fitness.append(30000)
         score = sum(fitness)
+        if game.winner() >= 1.0:
+            score += 30000
         print "\nGame finished in %d turns. Winner: %s. Score: %s" % (i,game.winner(), score)
         return {'fitness':score}
 
