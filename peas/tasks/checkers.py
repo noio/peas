@@ -98,14 +98,15 @@ class CheckersTask(object):
     """ Represents a checkers game played by an evolved phenotype against
         a fixed opponent.
     """
-    def __init__(self, search_depth=4):
+    def __init__(self, search_depth=4, opponent_handicap=0.0):
         self.search_depth = search_depth
+        self.opponent_handicap = opponent_handicap
 
     def evaluate(self, network):
         # Setup
         game = Checkers()
         player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)
-        opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=self.search_depth)
+        opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=self.search_depth, handicap=self.opponent_handicap)
         # Play the game
         fitness = [gamefitness(game)] * 100
         current, next = player, opponent
