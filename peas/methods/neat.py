@@ -412,7 +412,7 @@ class NEATPopulation(SimplePopulation):
                  old_age=30,
                  old_multiplier=0.2,
                  reset_innovations=False,
-                 survival=0.02,
+                 survival=0.2,
                  **kwargs):
         """ Initializes the object with settings,
             does not create a population yet.

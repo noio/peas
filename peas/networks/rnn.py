@@ -20,48 +20,56 @@ sqrt_two_pi = np.sqrt(np.pi * 2)
 ### FUNCTIONS ###
 
 # Node functions
-def ident(x):
-    return x
+def sum_ident(x):
+    return x.sum()
 
-def bound(x, clip=(-1.0, 1.0)):
-    return np.clip(x, *clip)
+def sum_bound(x, clip=(-1.0, 1.0)):
+    return np.clip(x.sum(), *clip)
 
-def gauss(x):
+def sum_gauss(x):
     """ Returns the pdf of a gaussian.
     """
-    return np.exp(-x ** 2 / 2.0) / sqrt_two_pi
+    return np.exp(-x.sum() ** 2 / 2.0) / sqrt_two_pi
     
-def sigmoid(x):
+def sum_sigmoid(x):
     """ Sigmoid function. 
-        >>> s = sigmoid( np.linspace(-3, 3, 10) )
+        >>> s = sum_sigmoid( np.linspace(-3, 3, 10) )
         >>> s[0] < 0.05 and s[-1] > 0.95
         True
     """
-    return 1 / (1 + np.exp(-x))
+    return 1 / (1 + np.exp(-x.sum()))
 
-def sigmoid2(x):
+def sum_sigmoid2(x):
     """ Sigmoid function. 
-        >>> s = sigmoid( np.linspace(-3, 3, 10) )
+        >>> s = sum_sigmoid2( np.linspace(-3, 3, 10) )
         >>> s[0] < 0.05 and s[-1] > 0.95
         True
     """
-    return 1 / (1 + np.exp(-4.9*x))
+    return 1 / (1 + np.exp(-4.9*x.sum()))
 
+def sum_abs(x):
+    return np.abs(x.sum())
+
+def sum_sin(x):
+    return np.sin(x.sum())
+
+def sum_tanh(x):
+    return np.tanh(x.sum())
 ### CONSTANTS ###
 
 
 ACTIVATION_FUNCS = {
-    'sin': np.sin,
-    'abs': np.abs,
-    'ident': ident,
-    'linear': ident,
-    'bound': bound,
-    'gauss': gauss,
-    'sigmoid': sigmoid,
-    'sigmoid2': sigmoid2,
-    'exp': sigmoid,
-    'tanh': np.tanh,
-    None : ident
+    'sin': sum_sin,
+    'abs': sum_abs,
+    'ident': sum_ident,
+    'linear': sum_ident,
+    'bound': sum_bound,
+    'gauss': sum_gauss,
+    'sigmoid': sum_sigmoid,
+    'sigmoid2': sum_sigmoid2,
+    'exp': sum_sigmoid,
+    'tanh': sum_tanh,
+    None : sum_ident
 }
 
 
@@ -203,7 +211,7 @@ class NeuralNetwork(object):
         # type.
         elif self.sandwich:
             act[:input_size] = input_activation.flat[:input_size]
-            act = np.dot(self.cm, act)
+            nodeinput = np.dot(self.cm, act)
             act = self.single_type(act)
         # All other recursive networks only activate once too, upon feeding
         # this means that upon each feed, activation propagates by one step.
