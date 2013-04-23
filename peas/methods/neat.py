@@ -30,7 +30,6 @@ class NEATGenotype(object):
     """ Implements the NEAT genotype, consisting of
         node genes and connection genes.
     """
-    
     def __init__(self, 
                  inputs=2, 
                  outputs=1, 
@@ -58,46 +57,45 @@ class NEATGenotype(object):
                  distance_excess=1.0,
                  distance_disjoint=1.0,
                  distance_weight=0.4):
-
         """ Refer to the NEAT paper for an explanation of these parameters.
         """
-        
+
         # Settings
-        self.inputs               = inputs
-        self.outputs              = outputs
+        self.inputs = inputs
+        self.outputs = outputs
         
         # Restrictions
-        self.types                = types
-        self.feedforward          = feedforward
-        self.max_depth            = max_depth
-        self.max_nodes            = max_nodes
+        self.types = types
+        self.feedforward = feedforward
+        self.max_depth = max_depth
+        self.max_nodes = max_nodes
         
         # Settings
-        self.response_default     = response_default
+        self.response_default = response_default
         self.initial_weight_stdev = initial_weight_stdev
-        self.bias_as_node         = bias_as_node
+        self.bias_as_node = bias_as_node
         
         # Mutation probabilities
-        self.prob_add_conn        = prob_add_conn
-        self.prob_add_node        = prob_add_node
-        self.prob_mutate_weight   = prob_mutate_weight
-        self.prob_reset_weight    = prob_reset_weight      
-        self.prob_reenable_conn   = prob_reenable_conn
+        self.prob_add_conn = prob_add_conn
+        self.prob_add_node = prob_add_node
+        self.prob_mutate_weight = prob_mutate_weight
+        self.prob_reset_weight = prob_reset_weight      
+        self.prob_reenable_conn = prob_reenable_conn
         self.prob_reenable_parent = prob_reenable_parent
-        self.prob_mutate_bias     = prob_mutate_bias
+        self.prob_mutate_bias = prob_mutate_bias
         self.prob_mutate_response = prob_mutate_response
-        self.prob_mutate_type     = prob_mutate_type
+        self.prob_mutate_type = prob_mutate_type
         
         # Mutation effects
-        self.stdev_mutate_weight   = stdev_mutate_weight
-        self.stdev_mutate_bias     = stdev_mutate_bias
+        self.stdev_mutate_weight = stdev_mutate_weight
+        self.stdev_mutate_bias = stdev_mutate_bias
         self.stdev_mutate_response = stdev_mutate_response
-        self.weight_range          = weight_range
+        self.weight_range = weight_range
         
         # Species distance measure
-        self.distance_excess   = distance_excess
+        self.distance_excess = distance_excess
         self.distance_disjoint = distance_disjoint
-        self.distance_weight   = distance_weight
+        self.distance_weight = distance_weight
         
         self.node_genes = [] #: Tuples of (fforder, type, bias, response, layer)
         self.conn_genes = {} #: Tuples of (innov, from, to, weight, enabled)
@@ -378,7 +376,6 @@ class NEATGenotype(object):
             raise Exception("Network is not feedforward.")
         
         return cm, node_types
-        
                 
     def __str__(self):
         return '%s with %d nodes and %d connections.' % (self.__class__.__name__, 
@@ -404,19 +401,18 @@ class NEATPopulation(SimplePopulation):
     """ A population object for NEAT, it contains the selection
         and reproduction methods.
     """
-    
     def __init__(self, geno_factory,
                  compatibility_threshold=3.0,
                  compatibility_threshold_delta=0.4,
                  target_species=12,
-                 reset_innovations=False,
-                 survival=0.2,
+                 min_elitism_size=5,
                  young_age=10,
                  young_multiplier=1.2,
+                 stagnation_age=15,
                  old_age=30,
                  old_multiplier=0.2,
-                 stagnation_age=15,
-                 min_elitism_size=5,
+                 reset_innovations=False,
+                 survival=0.02,
                  **kwargs):
         """ Initializes the object with settings,
             does not create a population yet.
