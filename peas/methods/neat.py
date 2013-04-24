@@ -116,7 +116,7 @@ class NEATGenotype(object):
             for i in xrange(self.inputs):
                 # We set the 'response' to 4.924273. Stanley doesn't mention having the response
                 # be subject to evolution, so this is #weird, but we'll do it because neat-python does.
-                self.node_genes.append( [i * 1024.0, "linear", 0.0, self.response_default, 0] )
+                self.node_genes.append( [i * 1024.0, 'linear', 0.0, self.response_default, 0] )
             
             # Create output nodes
             for i in xrange(self.outputs):
@@ -344,6 +344,7 @@ class NEATGenotype(object):
         
         # Assemble connectivity matrix
         cm = np.zeros((len(self.node_genes), len(self.node_genes)))
+        cm.fill(np.nan)
         for (_, fr, to, weight, enabled) in self.conn_genes.itervalues():
             if enabled:
                 cm[to, fr] = weight
@@ -367,7 +368,7 @@ class NEATGenotype(object):
             # bias node. It shouldn't matter though since the bias is used as an input.
             node_types = [node_types[0]] + list(node_types)
 
-        if self.feedforward and np.triu(cm).any():
+        if self.feedforward and np.triu(np.nan_to_num(cm)).any():
             import pprint
             pprint.pprint(self.node_genes)
             pprint.pprint(self.conn_genes)
@@ -413,7 +414,7 @@ class NEATPopulation(SimplePopulation):
                  old_age=30,
                  old_multiplier=0.2,
                  reset_innovations=False,
-                 survival=0.2,
+                 survival=0.05,
                  **kwargs):
         """ Initializes the object with settings,
             does not create a population yet.

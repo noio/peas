@@ -20,50 +20,50 @@ sqrt_two_pi = np.sqrt(np.pi * 2)
 ### FUNCTIONS ###
 
 # Node functions
-def sum_ident(x):
-    return x.sum()
+def ident(x):
+    return x
 
-def sum_bound(x, clip=(-1.0, 1.0)):
-    return np.clip(x.sum(), *clip)
+def bound(x, clip=(-1.0, 1.0)):
+    return np.clip(x, *clip)
 
-def sum_gauss(x):
+def gauss(x):
     """ Returns the pdf of a gaussian.
     """
-    return np.exp(-x.sum() ** 2 / 2.0) / sqrt_two_pi
+    return np.exp(-x ** 2 / 2.0) / sqrt_two_pi
     
-def sum_sigmoid(x):
+def sigmoid(x):
     """ Sigmoid function. 
     """
-    return 1 / (1 + np.exp(-x.sum()))
+    return 1 / (1 + np.exp(-x))
 
-def sum_sigmoid2(x):
+def sigmoid2(x):
     """ Sigmoid function. 
     """
-    return 1 / (1 + np.exp(-4.9*x.sum()))
+    return 1 / (1 + np.exp(-4.9*x))
 
-def sum_abs(x):
-    return np.abs(x.sum())
+def abs(x):
+    return np.abs(x)
 
-def sum_sin(x):
-    return np.sin(x.sum())
+def sin(x):
+    return np.sin(x)
 
-def sum_tanh(x):
-    return np.tanh(x.sum())
+def tanh(x):
+    return np.tanh(x)
 ### CONSTANTS ###
 
 
-ACTIVATION_FUNCS = {
-    'sin': sum_sin,
-    'abs': sum_abs,
-    'ident': sum_ident,
-    'linear': sum_ident,
-    'bound': sum_bound,
-    'gauss': sum_gauss,
-    'sigmoid': sum_sigmoid,
-    'sigmoid2': sum_sigmoid2,
-    'exp': sum_sigmoid,
-    'tanh': sum_tanh,
-    None : sum_ident
+SIMPLE_NODE_FUNCS = {
+    'sin': sin,
+    'abs': abs,
+    'ident': ident,
+    'linear': ident,
+    'bound': bound,
+    'gauss': gauss,
+    'sigmoid': sigmoid,
+    'sigmoid2': sigmoid2,
+    'exp': sigmoid,
+    'tanh': tanh,
+    None : ident
 }
 
 
@@ -82,10 +82,11 @@ class NeuralNetwork(object):
         # If the connectivity matrix is given as a hypercube, squash it down to 2D
         n_nodes = np.prod(self.original_shape)
         self.cm  = matrix.reshape((n_nodes,n_nodes))
-        self.node_types = [ACTIVATION_FUNCS[fn] for fn in node_types]
+        self.node_types = node_types
         if len(self.node_types) == 1:
             self.node_types *= n_nodes
         self.act = np.zeros(self.cm.shape[0])
+        self.optimize()
         return self
         
     def from_neatchromosome(self, chromosome):
@@ -93,6 +94,7 @@ class NeuralNetwork(object):
             the neat-python package. This is a connection-list
             representation.
         """
+        # TODO Deprecate the neat-python compatibility
         # Typecheck
         import neat.chromosome
         
@@ -125,10 +127,32 @@ class NeuralNetwork(object):
             if np.triu(self.cm).any():
                 raise Exception("NEAT Chromosome does not describe feedforward network.")
         node_order.remove('bias')
-        self.node_types = [ACTIVATION_FUNCS[nodes[i].activation_type] for i in node_order]
-        self.node_types = [ident] + self.node_types
+        self.node_types = [nodes[i].activation_type for i in node_order]
+        self.node_types = ['ident'] + self.node_types
         self.act = np.zeros(self.cm.shape[0])
+        self.optimize()
         return self
+
+    def optimize(self):
+        # If all nodes are simple nodes
+        if all(fn in SIMPLE_NODE_FUNCS for fn in self.node_types):
+            # Simply always sum the node inputs, this is faster
+            self.sum_all_node_inputs = True
+            self.cm = np.nan_to_num(self.cm)
+            # If all nodes are identical types
+            if all(fn == self.node_types[0] for fn in self.node_types):
+                self.all_nodes_same_function = True
+            self.node_types = [SIMPLE_NODE_FUNCS[fn] for fn in self.node_types]
+        else:
+            nt = []
+            for fn in self.node_types:
+                if fn in SIMPLE_NODE_FUNCS:
+                    # Substitute the function(x) for function(sum(x))
+                    nt.append(lambda x: SIMPLE_NODE_FUNCS[fn](x.sum()))
+                else:
+                    nt.append(COMPLEX_NODE_FUNCS[fn])
+            self.node_types = nt
+
     
     def __init__(self, source=None):
         # Set instance vars
@@ -137,6 +161,8 @@ class NeuralNetwork(object):
         self.cm             = None
         self.node_types     = None
         self.original_shape = None
+        self.sum_all_node_inputs = False
+        self.all_nodes_same_function = False
         
         if source is not None:
             try:
@@ -162,7 +188,7 @@ class NeuralNetwork(object):
     def make_feedforward(self):
         """ Zeros out all recursive connections. 
         """
-        if np.triu(self.cm).any():
+        if np.triu(np.nan_to_num(self.cm)).any():
             raise Exception("Connection Matrix does not describe feedforward network. \n %s" % np.sign(self.cm))
         self.feedforward = True
         self.cm[np.triu_indices(self.cm.shape[0])] = 0
@@ -192,16 +218,28 @@ class NeuralNetwork(object):
         input_size = min(act.size - 1, input_activation.size)
         node_count = act.size
         
-        # Feed forward nets reset the activation, then activate once
-        # for every node in the network.
+        # Feed forward nets reset the activation, and activate as many
+        # times as there are nodes
         if self.feedforward:
             act = np.zeros(cm.shape[0])
+            propagate = len(node_types)
+        # Sandwich networks only need to activate a single time
+        if self.sandwich:
+            propagate = 1
         for _ in xrange(propagate):
             act[:input_size] = input_activation.flat[:input_size]
-            nodeinputs = np.dot(self.cm, act)
-            for i in xrange(len(node_types)):
-                act[i] = node_types[i](nodeinputs[i])
-                
+            if self.sum_all_node_inputs:
+                nodeinputs = np.dot(self.cm, act)
+            else:
+                nodeinputs = self.cm * act
+                nodeinputs = [ni[-np.isnan(ni)] for ni in nodeinputs]
+            
+            if self.all_nodes_same_function:
+                act = node_types[0](nodeinputs)
+            else:
+                for i in xrange(len(node_types)):
+                    act[i] = node_types[i](nodeinputs[i])
+
         self.act = act
 
         # Reshape the output to 2D if it was 2D
