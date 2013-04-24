@@ -204,6 +204,8 @@ class NeuralNetwork(object):
             
             :param add_bias: Add a bias input automatically, before other inputs.
         """
+        if propagate != 1 and (self.feedforward or self.sandwich):
+            raise Exception("Feedforward and sandwich network have a fixed number of propagation steps.")
         act = self.act
         node_types = self.node_types
         cm = self.cm
@@ -228,6 +230,7 @@ class NeuralNetwork(object):
             propagate = 1
         for _ in xrange(propagate):
             act[:input_size] = input_activation.flat[:input_size]
+            
             if self.sum_all_node_inputs:
                 nodeinputs = np.dot(self.cm, act)
             else:

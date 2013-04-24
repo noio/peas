@@ -116,7 +116,7 @@ class NEATGenotype(object):
             for i in xrange(self.inputs):
                 # We set the 'response' to 4.924273. Stanley doesn't mention having the response
                 # be subject to evolution, so this is #weird, but we'll do it because neat-python does.
-                self.node_genes.append( [i * 1024.0, 'linear', 0.0, self.response_default, 0] )
+                self.node_genes.append( [i * 1024.0, types[0], 0.0, self.response_default, 0] )
             
             # Create output nodes
             for i in xrange(self.outputs):
