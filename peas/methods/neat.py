@@ -46,6 +46,7 @@ class NEATGenotype(object):
                  prob_mutate_weight=0.8,
                  prob_reset_weight=0.1,
                  prob_reenable_conn=0.01,
+                 prob_disable_conn=0.01,
                  prob_reenable_parent=0.25,
                  prob_mutate_bias=0.2,
                  prob_mutate_response=0.0,
@@ -81,6 +82,7 @@ class NEATGenotype(object):
         self.prob_mutate_weight = prob_mutate_weight
         self.prob_reset_weight = prob_reset_weight      
         self.prob_reenable_conn = prob_reenable_conn
+        self.prob_disable_conn = prob_disable_conn
         self.prob_reenable_parent = prob_reenable_parent
         self.prob_mutate_bias = prob_mutate_bias
         self.prob_mutate_response = prob_mutate_response
@@ -230,6 +232,9 @@ class NEATGenotype(object):
                     
                 if rand() < self.prob_reenable_conn:
                     cg[4] = True
+
+                if rand() < self.prob_disable_conn:
+                    cg[4] = False
                     
             # Mutate non-input nodes
             for node_gene in self.node_genes[self.inputs:]:
@@ -414,7 +419,7 @@ class NEATPopulation(SimplePopulation):
                  old_age=30,
                  old_multiplier=0.2,
                  reset_innovations=False,
-                 survival=0.05,
+                 survival=0.2,
                  **kwargs):
         """ Initializes the object with settings,
             does not create a population yet.

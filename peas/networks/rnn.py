@@ -49,8 +49,11 @@ def sin(x):
 
 def tanh(x):
     return np.tanh(x)
-### CONSTANTS ###
 
+def summed(fn):
+    return lambda x: fn(sum(x))
+
+### CONSTANTS ###
 
 SIMPLE_NODE_FUNCS = {
     'sin': sin,
@@ -64,6 +67,13 @@ SIMPLE_NODE_FUNCS = {
     'exp': sigmoid,
     'tanh': tanh,
     None : ident
+}
+
+def rbfgauss(x):
+    return np.exp(-(x ** 2).sum() / 2.0) / sqrt_two_pi
+
+COMPLEX_NODE_FUNCS = {
+    'rbfgauss': rbfgauss
 }
 
 
@@ -148,7 +158,7 @@ class NeuralNetwork(object):
             for fn in self.node_types:
                 if fn in SIMPLE_NODE_FUNCS:
                     # Substitute the function(x) for function(sum(x))
-                    nt.append(lambda x: SIMPLE_NODE_FUNCS[fn](x.sum()))
+                    nt.append(summed(SIMPLE_NODE_FUNCS[fn]))
                 else:
                     nt.append(COMPLEX_NODE_FUNCS[fn])
             self.node_types = nt
