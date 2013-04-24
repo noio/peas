@@ -363,7 +363,8 @@ class NEATGenotype(object):
         if not self.bias_as_node:
             cm = np.hstack( (np.atleast_2d(bias).T, cm) )
             cm = np.insert(cm, 0, 0.0, axis=0)
-            # TODO: this is a bit ugly, we duplicate the first node type for the bias node 
+            # TODO: this is a bit ugly, we duplicate the first node type for 
+            # bias node. It shouldn't matter though since the bias is used as an input.
             node_types = [node_types[0]] + list(node_types)
 
         if self.feedforward and np.triu(cm).any():

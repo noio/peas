@@ -33,17 +33,11 @@ def sum_gauss(x):
     
 def sum_sigmoid(x):
     """ Sigmoid function. 
-        >>> s = sum_sigmoid( np.linspace(-3, 3, 10) )
-        >>> s[0] < 0.05 and s[-1] > 0.95
-        True
     """
     return 1 / (1 + np.exp(-x.sum()))
 
 def sum_sigmoid2(x):
     """ Sigmoid function. 
-        >>> s = sum_sigmoid2( np.linspace(-3, 3, 10) )
-        >>> s[0] < 0.05 and s[-1] > 0.95
-        True
     """
     return 1 / (1 + np.exp(-4.9*x.sum()))
 
@@ -90,7 +84,6 @@ class NeuralNetwork(object):
         self.cm  = matrix.reshape((n_nodes,n_nodes))
         self.node_types = [ACTIVATION_FUNCS[fn] for fn in node_types]
         if len(self.node_types) == 1:
-            self.single_type = self.node_types[0]
             self.node_types *= n_nodes
         self.act = np.zeros(self.cm.shape[0])
         return self
@@ -143,7 +136,6 @@ class NeuralNetwork(object):
         self.sandwich       = False   
         self.cm             = None
         self.node_types     = None
-        self.single_type    = None
         self.original_shape = None
         
         if source is not None:
@@ -204,23 +196,11 @@ class NeuralNetwork(object):
         # for every node in the network.
         if self.feedforward:
             act = np.zeros(cm.shape[0])
+        for _ in xrange(propagate):
             act[:input_size] = input_activation.flat[:input_size]
-            for i in xrange(input_size, node_count):
-                act[i] = node_types[i](np.dot(cm[i], act))
-        # Sandwich networks activate once globally, and need a single activation
-        # type.
-        elif self.sandwich:
-            act[:input_size] = input_activation.flat[:input_size]
-            nodeinput = np.dot(self.cm, act)
-            act = self.single_type(act)
-        # All other recursive networks only activate once too, upon feeding
-        # this means that upon each feed, activation propagates by one step.
-        else:
-            for _ in xrange(propagate):
-                act[:input_size] = input_activation.flat[:input_size]
-                act = np.dot(self.cm, act)
-                for i in xrange(len(node_types)):
-                    act[i] = node_types[i](act[i])
+            nodeinputs = np.dot(self.cm, act)
+            for i in xrange(len(node_types)):
+                act[i] = node_types[i](nodeinputs[i])
                 
         self.act = act
 
@@ -231,7 +211,7 @@ class NeuralNetwork(object):
             return act.reshape(self.original_shape)
 
     def cm_string(self):
-        print "Connectivity matrix: %s", (self.cm.shape,)
+        print "Connectivity matrix: %s" % (self.cm.shape,)
         cp = self.cm.copy()
         s = np.empty(cp.shape, dtype='a1')
         s[cp == 0] = ' '
@@ -258,10 +238,7 @@ class NeuralNetwork(object):
         mw = abs(cm).max()
         for i in range(cm.shape[0]):
             G.add_node(i)
-            if self.single_type is not None:
-                t = self.single_type.__name__
-            else:
-                t = self.node_types[i].__name__
+            t = self.node_types[i].__name__
             G.get_node(i).attr['label'] = '%d:%s' % (i, t[:3])
             for j in range(cm.shape[1]):
                 w = cm[i,j]
@@ -294,6 +271,9 @@ class NeuralNetwork(object):
         
 
 if __name__ == '__main__':
-    import doctest
-    doctest.testmod(optionflags=doctest.ELLIPSIS)
+    # import doctest
+    # doctest.testmod(optionflags=doctest.ELLIPSIS)
+    a = NeuralNetwork().from_matrix(np.array([[0,0,0],[0,0,0],[1,1,0]]))
+    print a.cm_string()
+    print a.feed(np.array([1,1]), add_bias=False)
     
