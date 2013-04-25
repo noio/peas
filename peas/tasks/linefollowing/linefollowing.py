@@ -89,6 +89,7 @@ class Robot(object):
         self.body.velocity = self.body.velocity.projection(self.body.rotation_vector)
 
     def drive(self, l, r):
+        l, r = np.clip([l, r], -1, 1)
         l *= self.motor_torque
         r *= self.motor_torque
         self.body.apply_impulse((l,l) * self.body.rotation_vector, (0, -self.size / 2))
