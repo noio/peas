@@ -98,13 +98,14 @@ class CheckersTask(object):
     """ Represents a checkers game played by an evolved phenotype against
         a fixed opponent.
     """
-    def __init__(self, search_depth=4, opponent_handicap=0.0):
+    def __init__(self, search_depth=4, opponent_handicap=0.0, minefield=False):
         self.search_depth = search_depth
         self.opponent_handicap = opponent_handicap
+        self.minefield = minefield
 
     def evaluate(self, network):
         # Setup
-        game = Checkers()
+        game = Checkers(minefield=self.minefield)
         player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)
         opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=self.search_depth, handicap=self.opponent_handicap)
         # Play the game
@@ -385,7 +386,7 @@ class Checkers(object):
     """ Represents the checkers game(state)
     """
 
-    def __init__(self, non_capture_draw=30):
+    def __init__(self, non_capture_draw=30, minefield=False):
         """ Initialize the game board. """
         self.non_capture_draw = non_capture_draw
 
@@ -394,6 +395,7 @@ class Checkers(object):
         self.turn = 0
         self.history = []
         self.caphistory = []
+        self.minefield = minefield
 
         tiles = self.board > 0
         self.board[tiles] = EMPTY
@@ -499,12 +501,15 @@ class Checkers(object):
         (ly, lx) = positions[0]
         # Check for captures
         capture = False
+        stone_dies = False
         for (py, px) in positions[1:]:
             ydir = 1 if py > ly else -1
             xdir = 1 if px > lx else -1
             for y, x in zip(xrange(ly + ydir, py, ydir),xrange(lx + xdir, px, xdir)):
                 if self.board[y,x] != EMPTY:
                     self.board[y,x] = EMPTY
+                    if self.minefield and 2 <= x < 6 and 2 <= y < 6:
+                        stone_dies = True
                     capture = True
             (ly, lx) = (py, px)
         self.caphistory.append(capture)
@@ -517,6 +522,10 @@ class Checkers(object):
         if piece & BLACK and py == 7 or piece & WHITE and py == 0:
             piece = piece ^ MAN | KING
         self.board[py, px] = piece
+
+        # Kill the piece if a capture was performed on the minefield.
+        if stone_dies:
+            self.board[py, px] = EMPTY
 
         self.to_move = WHITE if self.to_move == BLACK else BLACK
         self.turn += 1
