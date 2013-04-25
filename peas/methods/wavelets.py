@@ -43,6 +43,7 @@ class WaveletGenotype(object):
                  prob_add=0.1,
                  prob_modify=0.3,
                  stdev_mutate=0.1,
+                 add_initial_uniform=False,
                  initial=1):
         # Instance vars
         self.inputs       = inputs
@@ -54,8 +55,10 @@ class WaveletGenotype(object):
         for _ in xrange(initial):
             for l in xrange(layers):
                 self.add_wavelet(l)
+                if add_initial_uniform:
+                    self.add_wavelet(l, uniform=True)
         
-    def add_wavelet(self, layer=None):
+    def add_wavelet(self, layer=None, uniform=False):
         if layer is None:
             layer = np.random.randint(0, len(self.wavelets))
         t = rand((2, 1)) * 2 - 1
@@ -63,6 +66,11 @@ class WaveletGenotype(object):
         norms = np.sqrt(np.sum(mat ** 2, axis=1))[:, np.newaxis]
         mat /= norms
         mat = np.hstack((mat, t))
+        # This option adds a large 'uniform' blob wavelet to allow evolution
+        # to set a zero weight level.
+        if uniform:
+            mat = np.diag(max(2, self.inputs))[:2]
+            mat = np.hstack(mat, np.array([[0, 0]]))
         sigma = np.random.normal(0.5, 0.3)
         weight = np.random.normal(0, 0.3)
         wavelet = [weight, sigma, mat]
