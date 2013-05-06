@@ -114,7 +114,10 @@ class LineFollowingTask(object):
                        motor_torque=6,
                        damping=0.2,
                        initial_pos=None,
-                       flush_each_step=False):
+                       flush_each_step=False,
+                       path_resolution=100,
+                       check_coverage=False,
+                       coverage_memory=20):
         # Settings
         self.max_steps = max_steps
         self.flush_each_step = flush_each_step
@@ -123,6 +126,10 @@ class LineFollowingTask(object):
         print "Using %s" % (self.fieldpath,)
         field_friction = imread(self.fieldpath)
         field_observation = imread(self.observationpath)
+        self.path_resolution = path_resolution
+        self.check_coverage = check_coverage
+        self.coverage_memory = coverage_memory
+        
         
         self.field_friction = field_friction[:,:,0].astype(np.float)/255
         self.field_observation   = field_observation[:,:,0].astype(np.float)/255
@@ -164,6 +171,7 @@ class LineFollowingTask(object):
                              friction_scale=self.friction_scale, motor_torque=self.motor_torque)
     
         path = [(robot.body.position.int_tuple)]
+        cells = []
         
         if network.cm.shape[0] != (3*5 + 3*3 + 1):
             raise Exception("Network shape must be a 2 layer controller: 3x5 input + 3x3 hidden + 1 bias. Has %d." % network.cm.shape[0])
@@ -180,9 +188,20 @@ class LineFollowingTask(object):
             robot.drive(*action)
             robot.apply_friction()
             space.step(1/50.0)
+
+            new_cell_covered = False
+            current_cell = int(robot.body.position.x // 32), int(robot.body.position.y // 32)
+            if current_cell not in cells:
+                cells.append(current_cell)
+                new_cell_covered = True
+                if len(cells) > self.coverage_memory:
+                    cells.pop(0)
+            elif cells[-1] == current_cell:
+                new_cell_covered = True
             
-            if step % 100 == 0:
+            if step % self.path_resolution == 0 and (not self.check_coverage or new_cell_covered):
                 path.append((robot.body.position.int_tuple))
+
 
             if draw:
                 screen.fill((255, 255, 255))
