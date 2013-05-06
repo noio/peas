@@ -200,7 +200,11 @@ class SimpleHeuristic(object):
         vb = (100 * nbm + 130 * nbk)
         vw = (100 * nwm + 130 * nwk)
         
-        val = (vb - vw) + (250 * (vb-vw))/(vb+vw); #favor exchanges if in material plus
+        val = 0
+        
+        if (vb + vw) > 0:        
+            val = (vb - vw) + (250 * (vb-vw))/(vb+vw); #favor exchanges if in material plus
+
 
         nm = nwm + nbm
         nk = nwk + nbk
