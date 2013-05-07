@@ -73,7 +73,7 @@ def rbfgauss(x):
     return np.exp(-(x ** 2).sum() / 2.0) / sqrt_two_pi
 
 def rbfwavelet(x):
-    return np.exp(-(x ** 2).sum() / ( 2* 0.5**2 )) * np.cos(2 * np.pi * x[0] + np.pi / 2)
+    return np.exp(-(x ** 2).sum() / ( 2* 0.5**2 )) * np.sin(2 * np.pi * x[0])
 
 COMPLEX_NODE_FUNCS = {
     'rbfgauss': rbfgauss,
