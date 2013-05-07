@@ -33,26 +33,31 @@ def gauss(x):
     
 def sigmoid(x):
     """ Sigmoid function. 
-        >>> s = sigmoid( np.linspace(-3, 3, 10) )
-        >>> s[0] < 0.05 and s[-1] > 0.95
-        True
     """
     return 1 / (1 + np.exp(-x))
 
 def sigmoid2(x):
     """ Sigmoid function. 
-        >>> s = sigmoid( np.linspace(-3, 3, 10) )
-        >>> s[0] < 0.05 and s[-1] > 0.95
-        True
     """
     return 1 / (1 + np.exp(-4.9*x))
 
+def abs(x):
+    return np.abs(x)
+
+def sin(x):
+    return np.sin(x)
+
+def tanh(x):
+    return np.tanh(x)
+
+def summed(fn):
+    return lambda x: fn(sum(x))
+
 ### CONSTANTS ###
 
-
-ACTIVATION_FUNCS = {
-    'sin': np.sin,
-    'abs': np.abs,
+SIMPLE_NODE_FUNCS = {
+    'sin': sin,
+    'abs': abs,
     'ident': ident,
     'linear': ident,
     'bound': bound,
@@ -60,8 +65,19 @@ ACTIVATION_FUNCS = {
     'sigmoid': sigmoid,
     'sigmoid2': sigmoid2,
     'exp': sigmoid,
-    'tanh': np.tanh,
+    'tanh': tanh,
     None : ident
+}
+
+def rbfgauss(x):
+    return np.exp(-(x ** 2).sum() / 2.0) / sqrt_two_pi
+
+def rbfwavelet(x):
+    return np.exp(-(x ** 2).sum() / ( 2* 0.5**2 )) * np.cos(2 * np.pi * x[0] + np.pi / 2)
+
+COMPLEX_NODE_FUNCS = {
+    'rbfgauss': rbfgauss,
+    'rbfwavelet': rbfwavelet
 }
 
 
@@ -80,11 +96,11 @@ class NeuralNetwork(object):
         # If the connectivity matrix is given as a hypercube, squash it down to 2D
         n_nodes = np.prod(self.original_shape)
         self.cm  = matrix.reshape((n_nodes,n_nodes))
-        self.node_types = [ACTIVATION_FUNCS[fn] for fn in node_types]
+        self.node_types = node_types
         if len(self.node_types) == 1:
-            self.single_type = self.node_types[0]
             self.node_types *= n_nodes
         self.act = np.zeros(self.cm.shape[0])
+        self.optimize()
         return self
         
     def from_neatchromosome(self, chromosome):
@@ -92,6 +108,7 @@ class NeuralNetwork(object):
             the neat-python package. This is a connection-list
             representation.
         """
+        # TODO Deprecate the neat-python compatibility
         # Typecheck
         import neat.chromosome
         
@@ -124,10 +141,32 @@ class NeuralNetwork(object):
             if np.triu(self.cm).any():
                 raise Exception("NEAT Chromosome does not describe feedforward network.")
         node_order.remove('bias')
-        self.node_types = [ACTIVATION_FUNCS[nodes[i].activation_type] for i in node_order]
-        self.node_types = [ident] + self.node_types
+        self.node_types = [nodes[i].activation_type for i in node_order]
+        self.node_types = ['ident'] + self.node_types
         self.act = np.zeros(self.cm.shape[0])
+        self.optimize()
         return self
+
+    def optimize(self):
+        # If all nodes are simple nodes
+        if all(fn in SIMPLE_NODE_FUNCS for fn in self.node_types):
+            # Simply always sum the node inputs, this is faster
+            self.sum_all_node_inputs = True
+            self.cm = np.nan_to_num(self.cm)
+            # If all nodes are identical types
+            if all(fn == self.node_types[0] for fn in self.node_types):
+                self.all_nodes_same_function = True
+            self.node_types = [SIMPLE_NODE_FUNCS[fn] for fn in self.node_types]
+        else:
+            nt = []
+            for fn in self.node_types:
+                if fn in SIMPLE_NODE_FUNCS:
+                    # Substitute the function(x) for function(sum(x))
+                    nt.append(summed(SIMPLE_NODE_FUNCS[fn]))
+                else:
+                    nt.append(COMPLEX_NODE_FUNCS[fn])
+            self.node_types = nt
+
     
     def __init__(self, source=None):
         # Set instance vars
@@ -135,8 +174,9 @@ class NeuralNetwork(object):
         self.sandwich       = False   
         self.cm             = None
         self.node_types     = None
-        self.single_type    = None
         self.original_shape = None
+        self.sum_all_node_inputs = False
+        self.all_nodes_same_function = False
         
         if source is not None:
             try:
@@ -162,7 +202,7 @@ class NeuralNetwork(object):
     def make_feedforward(self):
         """ Zeros out all recursive connections. 
         """
-        if np.triu(self.cm).any():
+        if np.triu(np.nan_to_num(self.cm)).any():
             raise Exception("Connection Matrix does not describe feedforward network. \n %s" % np.sign(self.cm))
         self.feedforward = True
         self.cm[np.triu_indices(self.cm.shape[0])] = 0
@@ -178,6 +218,8 @@ class NeuralNetwork(object):
             
             :param add_bias: Add a bias input automatically, before other inputs.
         """
+        if propagate != 1 and (self.feedforward or self.sandwich):
+            raise Exception("Feedforward and sandwich network have a fixed number of propagation steps.")
         act = self.act
         node_types = self.node_types
         cm = self.cm
@@ -192,28 +234,29 @@ class NeuralNetwork(object):
         input_size = min(act.size - 1, input_activation.size)
         node_count = act.size
         
-        # Feed forward nets reset the activation, then activate once
-        # for every node in the network.
+        # Feed forward nets reset the activation, and activate as many
+        # times as there are nodes
         if self.feedforward:
             act = np.zeros(cm.shape[0])
+            propagate = len(node_types)
+        # Sandwich networks only need to activate a single time
+        if self.sandwich:
+            propagate = 1
+        for _ in xrange(propagate):
             act[:input_size] = input_activation.flat[:input_size]
-            for i in xrange(input_size, node_count):
-                act[i] = node_types[i](np.dot(cm[i], act))
-        # Sandwich networks activate once globally, and need a single activation
-        # type.
-        elif self.sandwich:
-            act[:input_size] = input_activation.flat[:input_size]
-            act = np.dot(self.cm, act)
-            act = self.single_type(act)
-        # All other recursive networks only activate once too, upon feeding
-        # this means that upon each feed, activation propagates by one step.
-        else:
-            for _ in xrange(propagate):
-                act[:input_size] = input_activation.flat[:input_size]
-                act = np.dot(self.cm, act)
+            
+            if self.sum_all_node_inputs:
+                nodeinputs = np.dot(self.cm, act)
+            else:
+                nodeinputs = self.cm * act
+                nodeinputs = [ni[-np.isnan(ni)] for ni in nodeinputs]
+            
+            if self.all_nodes_same_function:
+                act = node_types[0](nodeinputs)
+            else:
                 for i in xrange(len(node_types)):
-                    act[i] = node_types[i](act[i])
-                
+                    act[i] = node_types[i](nodeinputs[i])
+
         self.act = act
 
         # Reshape the output to 2D if it was 2D
@@ -223,7 +266,7 @@ class NeuralNetwork(object):
             return act.reshape(self.original_shape)
 
     def cm_string(self):
-        print "Connectivity matrix: %s", (self.cm.shape,)
+        print "Connectivity matrix: %s" % (self.cm.shape,)
         cp = self.cm.copy()
         s = np.empty(cp.shape, dtype='a1')
         s[cp == 0] = ' '
@@ -250,10 +293,7 @@ class NeuralNetwork(object):
         mw = abs(cm).max()
         for i in range(cm.shape[0]):
             G.add_node(i)
-            if self.single_type is not None:
-                t = self.single_type.__name__
-            else:
-                t = self.node_types[i].__name__
+            t = self.node_types[i].__name__
             G.get_node(i).attr['label'] = '%d:%s' % (i, t[:3])
             for j in range(cm.shape[1]):
                 w = cm[i,j]
@@ -286,6 +326,9 @@ class NeuralNetwork(object):
         
 
 if __name__ == '__main__':
-    import doctest
-    doctest.testmod(optionflags=doctest.ELLIPSIS)
+    # import doctest
+    # doctest.testmod(optionflags=doctest.ELLIPSIS)
+    a = NeuralNetwork().from_matrix(np.array([[0,0,0],[0,0,0],[1,1,0]]))
+    print a.cm_string()
+    print a.feed(np.array([1,1]), add_bias=False)
     
