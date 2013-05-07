@@ -16,7 +16,7 @@ class XORTask(object):
     
     # Default XOR input/output pairs
     INPUTS  = [(0,0), (0,1), (1,0), (1,1)]
-    OUTPUTS = [(0,), (1,), (1,), (0,)]
+    OUTPUTS = [(-1,), (1,), (1,), (-1,)]
     EPSILON = 1e-100
     
     def __init__(self, do_all=True):
@@ -29,6 +29,9 @@ class XORTask(object):
             network = NeuralNetwork(network)
         
         network.make_feedforward()
+
+        if not network.node_types[-1](-1000) < -0.95:
+            raise Exception("Network should be able to output value of -1, e.g. using a tanh node.")
         
         pairs = zip(self.INPUTS, self.OUTPUTS)
         random.shuffle(pairs)

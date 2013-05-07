@@ -46,6 +46,7 @@ class NEATGenotype(object):
                  prob_mutate_weight=0.8,
                  prob_reset_weight=0.1,
                  prob_reenable_conn=0.01,
+                 prob_disable_conn=0.01,
                  prob_reenable_parent=0.25,
                  prob_mutate_bias=0.2,
                  prob_mutate_response=0.0,
@@ -81,6 +82,7 @@ class NEATGenotype(object):
         self.prob_mutate_weight = prob_mutate_weight
         self.prob_reset_weight = prob_reset_weight      
         self.prob_reenable_conn = prob_reenable_conn
+        self.prob_disable_conn = prob_disable_conn
         self.prob_reenable_parent = prob_reenable_parent
         self.prob_mutate_bias = prob_mutate_bias
         self.prob_mutate_response = prob_mutate_response
@@ -116,7 +118,7 @@ class NEATGenotype(object):
             for i in xrange(self.inputs):
                 # We set the 'response' to 4.924273. Stanley doesn't mention having the response
                 # be subject to evolution, so this is #weird, but we'll do it because neat-python does.
-                self.node_genes.append( [i * 1024.0, "linear", 0.0, self.response_default, 0] )
+                self.node_genes.append( [i * 1024.0, types[0], 0.0, self.response_default, 0] )
             
             # Create output nodes
             for i in xrange(self.outputs):
@@ -165,33 +167,34 @@ class NEATGenotype(object):
             if self.max_depth is not None:
                 possible_to_split = [(fr, to) for (fr, to) in possible_to_split if
                                         self.node_genes[fr][4] + 1 < self.node_genes[to][4]]
-            to_split = self.conn_genes[random.choice(possible_to_split)]
-            to_split[4] = False # Disable the old connection
-            fr, to, w = to_split[1:4]
-            avg_fforder = (self.node_genes[fr][0] + self.node_genes[to][0]) * 0.5
-            # We assign a random function type to the node, which is #weird
-            # because I thought that in NEAT these kind of mutations
-            # initially don't affect the functionality of the network.
-            new_type = random.choice(self.types)
-            # We assign a 'layer' to the new node that is one lower than the target of the connection
-            layer = self.node_genes[fr][4] + 1
-            node_gene = [avg_fforder, new_type, 0.0, self.response_default, layer]
-            new_id = len(self.node_genes)
-            self.node_genes.append(node_gene)
+            if possible_to_split:
+                to_split = self.conn_genes[random.choice(possible_to_split)]
+                to_split[4] = False # Disable the old connection
+                fr, to, w = to_split[1:4]
+                avg_fforder = (self.node_genes[fr][0] + self.node_genes[to][0]) * 0.5
+                # We assign a random function type to the node, which is #weird
+                # because I thought that in NEAT these kind of mutations
+                # initially don't affect the functionality of the network.
+                new_type = random.choice(self.types)
+                # We assign a 'layer' to the new node that is one lower than the target of the connection
+                layer = self.node_genes[fr][4] + 1
+                node_gene = [avg_fforder, new_type, 0.0, self.response_default, layer]
+                new_id = len(self.node_genes)
+                self.node_genes.append(node_gene)
 
-            if (fr, new_id) in innovations:
-                innov = innovations[(fr, new_id)]
-            else:
-                maxinnov += 1
-                innov = innovations[(fr, new_id)] = maxinnov
-            self.conn_genes[(fr, new_id)] = [innov, fr, new_id, 1.0, True]
+                if (fr, new_id) in innovations:
+                    innov = innovations[(fr, new_id)]
+                else:
+                    maxinnov += 1
+                    innov = innovations[(fr, new_id)] = maxinnov
+                self.conn_genes[(fr, new_id)] = [innov, fr, new_id, 1.0, True]
 
-            if (new_id, to) in innovations:
-                innov = innovations[(new_id, to)]
-            else:
-                maxinnov += 1
-                innov = innovations[(new_id, to)] = maxinnov
-            self.conn_genes[(new_id, to)] = [innov, new_id, to, w, True]
+                if (new_id, to) in innovations:
+                    innov = innovations[(new_id, to)]
+                else:
+                    maxinnov += 1
+                    innov = innovations[(new_id, to)] = maxinnov
+                self.conn_genes[(new_id, to)] = [innov, new_id, to, w, True]
             
         # This is #weird, why use "elif"? but this is what
         # neat-python does, so I'm copying.
@@ -230,6 +233,9 @@ class NEATGenotype(object):
                     
                 if rand() < self.prob_reenable_conn:
                     cg[4] = True
+
+                if rand() < self.prob_disable_conn:
+                    cg[4] = False
                     
             # Mutate non-input nodes
             for node_gene in self.node_genes[self.inputs:]:
@@ -344,6 +350,7 @@ class NEATGenotype(object):
         
         # Assemble connectivity matrix
         cm = np.zeros((len(self.node_genes), len(self.node_genes)))
+        cm.fill(np.nan)
         for (_, fr, to, weight, enabled) in self.conn_genes.itervalues():
             if enabled:
                 cm[to, fr] = weight
@@ -363,10 +370,11 @@ class NEATGenotype(object):
         if not self.bias_as_node:
             cm = np.hstack( (np.atleast_2d(bias).T, cm) )
             cm = np.insert(cm, 0, 0.0, axis=0)
-            # TODO: this is a bit ugly, we duplicate the first node type for the bias node 
+            # TODO: this is a bit ugly, we duplicate the first node type for 
+            # bias node. It shouldn't matter though since the bias is used as an input.
             node_types = [node_types[0]] + list(node_types)
 
-        if self.feedforward and np.triu(cm).any():
+        if self.feedforward and np.triu(np.nan_to_num(cm)).any():
             import pprint
             pprint.pprint(self.node_genes)
             pprint.pprint(self.conn_genes)
@@ -412,7 +420,7 @@ class NEATPopulation(SimplePopulation):
                  old_age=30,
                  old_multiplier=0.2,
                  reset_innovations=False,
-                 survival=0.02,
+                 survival=0.2,
                  **kwargs):
         """ Initializes the object with settings,
             does not create a population yet.
