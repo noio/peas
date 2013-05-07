@@ -69,8 +69,8 @@ class WaveletGenotype(object):
         # This option adds a large 'uniform' blob wavelet to allow evolution
         # to set a zero weight level.
         if uniform:
-            mat = np.diag(max(2, self.inputs))[:2]
-            mat = np.hstack(mat, np.array([[0, 0]]))
+            mat = np.eye(2, self.inputs) * 0.1
+            mat = np.hstack((mat, np.array([[0], [0]])))
         sigma = np.random.normal(0.5, 0.3)
         weight = np.random.normal(0, 0.3)
         wavelet = [weight, sigma, mat]
