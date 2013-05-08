@@ -147,7 +147,6 @@ class LineFollowingTask(object):
         self.check_coverage = check_coverage
         self.coverage_memory = coverage_memory
         
-        
         self.field_friction = field_friction[:,:,0].astype(np.float)/255
         self.field_observation   = field_observation[:,:,0].astype(np.float)/255
         

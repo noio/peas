@@ -508,7 +508,7 @@ class NEATPopulation(SimplePopulation):
             self.current_compatibility_threshold += self.compatibility_threshold_delta
         
         ## FIND CHAMPION / CHECK FOR SOLUTION
-        self._find_best(pop)
+        self._find_best(pop, solution)
 
         ## REPRODUCE
         
