@@ -128,13 +128,14 @@ class CheckersTask(object):
                 print game
         print game
         score = sum(fitness)
-        if game.winner() >= 1.0:
+        won = game.winner() >= 1.0
+        if won:
             score += 30000
         print "\nGame finished in %d turns. Winner: %s. Score: %s" % (i,game.winner(), score)
-        return {'fitness':score}
+        return {'fitness':score, 'won': won}
 
     def solve(self, network):
-        return self.evaluate(network)['fitness'] > 30000
+        return self.evaluate(network)['won']
 
     def visualize(self, network):
         pass
