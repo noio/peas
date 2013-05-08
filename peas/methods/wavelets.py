@@ -66,13 +66,14 @@ class WaveletGenotype(object):
         norms = np.sqrt(np.sum(mat ** 2, axis=1))[:, np.newaxis]
         mat /= norms
         mat = np.hstack((mat, t))
+        sigma = np.random.normal(0.5, 0.3)
+        weight = np.random.normal(0, 0.3)
         # This option adds a large 'uniform' blob wavelet to allow evolution
         # to set a zero weight level.
         if uniform:
             mat = np.eye(2, self.inputs) * 0.1
             mat = np.hstack((mat, np.array([[0], [0]])))
-        sigma = np.random.normal(0.5, 0.3)
-        weight = np.random.normal(0, 0.3)
+            weight = 0.0
         wavelet = [weight, sigma, mat]
         self.wavelets[layer].append(wavelet)
     
@@ -121,9 +122,9 @@ class WaveletDeveloper(object):
         for (i,j), coords, conn_id, expr_id in self.substrate.get_connection_list(self.add_deltas):
             # Add a bias (translation)
             coords = np.hstack((coords, [1]))
-            weight = sum(weight * gabor(*(np.dot(mat, coords)), sigma=sigma) 
-                        for (weight, sigma, mat) in individual.wavelets[conn_id])
-            cm[j,i] = weight
+            w = sum(weight * gabor(*(np.dot(mat, coords)), sigma=sigma) 
+                    for (weight, sigma, mat) in individual.wavelets[conn_id])
+            cm[j,i] = w
         
         # Rescale weights
         cm[np.abs(cm) < self.min_weight] = 0
