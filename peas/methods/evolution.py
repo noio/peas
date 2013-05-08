@@ -151,6 +151,7 @@ class SimplePopulation(object):
             else:
                 raise Exception("Solution checker must be a threshold fitness value,"\
                                 "a callable, or an object with a method 'solve'.")
+            
             if solved and self.solved_at is None:
                 self.solved_at = self.generation
                 
