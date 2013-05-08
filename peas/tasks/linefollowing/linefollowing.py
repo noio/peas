@@ -59,12 +59,22 @@ class Robot(object):
         
         self.sensors = [(r, theta) for r in np.linspace(1,4,3) * size * 0.75
                                    for theta in np.linspace(-0.5 * np.pi, 0.5 * np.pi, 5)]
+
+        self.l = self.r = 0
         
     
     def sensor_locations(self):
         for (r, theta) in self.sensors:
             (x, y) = np.cos(theta) * r, np.sin(theta) * r
             yield self.body.local_to_world((x, y))
+
+    def wheel_locations(self, rel=True):
+        lwheel = self.body.local_to_world((0, -self.size / 2))
+        rwheel = self.body.local_to_world((0, self.size / 2))
+        if rel:
+            lwheel -= self.body.position
+            rwheel -= self.body.position
+        return (lwheel, rwheel)
             
     def sensor_response(self):
         for point in self.sensor_locations():
@@ -89,16 +99,23 @@ class Robot(object):
         self.body.velocity = self.body.velocity.projection(self.body.rotation_vector)
 
     def drive(self, l, r):
-        l, r = np.clip([l, r], -1, 1)
-        l *= self.motor_torque
-        r *= self.motor_torque
-        self.body.apply_impulse((l,l) * self.body.rotation_vector, (0, -self.size / 2))
-        self.body.apply_impulse((r,r) * self.body.rotation_vector, (0, self.size / 2))
+        self.l, self.r = np.clip([l, r], -1, 1)
+        self.l *= self.motor_torque
+        self.r *= self.motor_torque
+        lw, rw = self.wheel_locations()
+        self.l = float(self.l)
+        self.r = float(self.r)
+        self.body.apply_impulse( self.l * self.body.rotation_vector, lw)
+        self.body.apply_impulse( self.r * self.body.rotation_vector, rw)
         
     def draw(self, screen):
         import pygame
         pygame.draw.lines(screen, (255,0,0), True, [(int(p.x), int(p.y)) for p in self.shape.get_points()])
         
+        lw, rw = self.wheel_locations(rel=False)
+        pygame.draw.line(screen, (255, 0, 255), lw, lw + self.body.rotation_vector * 50. * self.l / self.motor_torque, 2)
+        pygame.draw.line(screen, (255, 0, 255), rw, rw + self.body.rotation_vector * 50. * self.r / self.motor_torque, 2) 
+
         for ((x, y), response) in zip(self.sensor_locations(), self.sensor_response()):
             r = 255 * response
             pygame.draw.circle(screen, (255 - r, r, 0), (int(x), int(y)), 2)
