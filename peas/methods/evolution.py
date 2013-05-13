@@ -58,7 +58,7 @@ class SimplePopulation(object):
         cpus = multiprocessing.cpu_count()
         use_cores = min(self.max_cores, cpus-1)
         if use_cores > 1:
-            self.pool = multiprocessing.Pool(processes=use_cores)
+            self.pool = multiprocessing.Pool(processes=use_cores, maxtasksperchild=5)
         else:
             self.pool = None
         
@@ -129,7 +129,7 @@ class SimplePopulation(object):
         """
         to_eval = [(individual, evaluator) for individual in pop]
         if self.pool is not None:
-            print "Running in %d processes." % use_cores
+            print "Running in %d processes." % self.pool._processes
             pop = self.pool.map(evaluate_individual, to_eval)
         else:
             print "Running in single process."
