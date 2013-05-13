@@ -122,10 +122,6 @@ class CheckersTask(object):
             fitness.append(gamefitness(game))
             sys.stdout.write('.')
             sys.stdout.flush()
-            if i > 50:
-                print "Turn %d" % i
-                print game.check_draw(verbose=True)
-                print game
         print game
         score = sum(fitness)
         won = game.winner() >= 1.0
