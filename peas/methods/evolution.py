@@ -54,6 +54,13 @@ class SimplePopulation(object):
         self.tournament_selection_k = tournament_selection_k
         self.verbose                = verbose
         self.max_cores              = max_cores
+
+        cpus = multiprocessing.cpu_count()
+        use_cores = min(self.max_cores, cpus-1)
+        if use_cores > 1:
+            self.pool = multiprocessing.Pool(processes=use_cores)
+        else:
+            self.pool = None
         
     def _reset(self):
         """ Resets the state of this population.
@@ -121,12 +128,9 @@ class SimplePopulation(object):
             and assigns their "stats" property.
         """
         to_eval = [(individual, evaluator) for individual in pop]
-        cpus = multiprocessing.cpu_count()
-        use_cores = min(self.max_cores, cpus-1)
-        if use_cores > 1:
+        if self.pool is not None:
             print "Running in %d processes." % use_cores
-            pool = multiprocessing.Pool(processes=use_cores)
-            pop = pool.map(evaluate_individual, to_eval)
+            pop = self.pool.map(evaluate_individual, to_eval)
         else:
             print "Running in single process."
             pop = map(evaluate_individual, to_eval)
