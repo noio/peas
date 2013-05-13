@@ -10,7 +10,6 @@ import os
 import numpy as np
 from numpy.linalg import lstsq
 import scipy.misc
-from PIL import Image
 
 # Local
 from ..networks.rnn import NeuralNetwork
