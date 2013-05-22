@@ -41,6 +41,10 @@ SAFEEDGE = [(0,6), (1,7), (6,0), (7,1)]
                  
 INVNUM = dict([(n, tuple(a[0] for a in np.nonzero(NUMBERING == n))) for n in range(1, NUMBERING.max() + 1)])
 
+### EXCEPTIONS
+
+class IllegalMoveError(Exception):
+    pass
 
 ### FUNCTIONS ###
 num_evals = 0
@@ -98,16 +102,18 @@ class CheckersTask(object):
     """ Represents a checkers game played by an evolved phenotype against
         a fixed opponent.
     """
-    def __init__(self, search_depth=4, opponent_handicap=0.0, minefield=False):
+    def __init__(self, search_depth=4, opponent_search_depth=4, opponent_handicap=0.0, minefield=False, win_to_solve=3):
         self.search_depth = search_depth
+        self.opponent_search_depth = opponent_search_depth
         self.opponent_handicap = opponent_handicap
+        self.win_to_solve = win_to_solve
         self.minefield = minefield
 
     def evaluate(self, network):
         # Setup
         game = Checkers(minefield=self.minefield)
         player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)
-        opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=self.search_depth, handicap=self.opponent_handicap)
+        opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=self.opponent_search_depth, handicap=self.opponent_handicap)
         # Play the game
         fitness = [gamefitness(game)] * 100
         current, next = player, opponent
@@ -131,7 +137,10 @@ class CheckersTask(object):
         return {'fitness':score, 'won': won}
 
     def solve(self, network):
-        return self.evaluate(network)['won']
+        for _ in range(self.win_to_solve):
+            if not self.evaluate(network)['won']:
+                return False
+        return True
 
     def visualize(self, network):
         pass
@@ -387,7 +396,7 @@ class Checkers(object):
     """ Represents the checkers game(state)
     """
 
-    def __init__(self, non_capture_draw=30, minefield=False):
+    def __init__(self, non_capture_draw=30, fly_kings=True, minefield=False):
         """ Initialize the game board. """
         self.non_capture_draw = non_capture_draw
 
@@ -397,6 +406,7 @@ class Checkers(object):
         self.history = []
         self.caphistory = []
         self.minefield = minefield
+        self.fly_kings = fly_kings
 
         tiles = self.board > 0
         self.board[tiles] = EMPTY
@@ -447,6 +457,8 @@ class Checkers(object):
                                     break
                                 else:
                                     yield (n, NUMBERING[ty, tx])
+                                if not self.fly_kings:
+                                    break
                                 dist += 1
 
     
@@ -490,13 +502,15 @@ class Checkers(object):
                                     yield (NUMBERING[py, px],) + sequence
                         break
                     else:
-                        if piece & MAN:
+                        if piece & MAN or not self.fly_kings:
                             break
         yield (NUMBERING[py, px],)
                         
         
     def play(self, move):
         """ Play the given move on the board. """
+        if move not in self.all_moves():
+            raise IllegalMoveError("Illegal move")
         self.history.append(move)
         positions = [INVNUM[p] for p in move]
         (ly, lx) = positions[0]
@@ -589,18 +603,37 @@ if __name__ == '__main__':
     n = 3
     tic = time.time()
     for i in range(n):
-        game = Checkers()
-        player = HeuristicOpponent(SimpleHeuristic())
+        game = Checkers(fly_kings=False)
+        player = None
         # opponent = HeuristicOpponent(PieceCounter())
-        opponent = RandomOpponent()
+        opponent = HeuristicOpponent(SimpleHeuristic())
         # Play the game
         current, next = player, opponent
         i = 0
         while not game.game_over():
             i += 1
-            move = current.pickmove(game)
+            print game
+            print NUMBERING
+            print "enter move"
+            moved = False
+            while not moved:
+                try:
+                    user_input = raw_input()
+                    if 'q' in user_input:
+                        sys.exit()
+                    if ' ' in user_input:
+                        move = tuple(int(i) for i in user_input.split(' '))
+                    else:
+                        move = tuple(int(i) for i in user_input.split('-'))
+                    game.play(move)
+                    moved = True
+                except IllegalMoveError:
+                    print "Illegal move"
+
+            move = opponent.pickmove(game)
+            print move
             game.play(move)
-            current, next = next, current
+            
         scores.append(gamefitness(game))
     print (time.time() - tic) / n
     print 'Evals: %d' % (num_evals / n)
