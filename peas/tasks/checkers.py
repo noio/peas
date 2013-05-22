@@ -102,16 +102,18 @@ class CheckersTask(object):
     """ Represents a checkers game played by an evolved phenotype against
         a fixed opponent.
     """
-    def __init__(self, search_depth=4, opponent_handicap=0.0, minefield=False):
+    def __init__(self, search_depth=4, opponent_search_depth=4, opponent_handicap=0.0, minefield=False, win_to_solve=3):
         self.search_depth = search_depth
+        self.opponent_search_depth = opponent_search_depth
         self.opponent_handicap = opponent_handicap
+        self.win_to_solve = win_to_solve
         self.minefield = minefield
 
     def evaluate(self, network):
         # Setup
         game = Checkers(minefield=self.minefield)
         player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)
-        opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=self.search_depth, handicap=self.opponent_handicap)
+        opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=self.opponent_search_depth, handicap=self.opponent_handicap)
         # Play the game
         fitness = [gamefitness(game)] * 100
         current, next = player, opponent
@@ -135,7 +137,10 @@ class CheckersTask(object):
         return {'fitness':score, 'won': won}
 
     def solve(self, network):
-        return self.evaluate(network)['won']
+        for _ in range(self.win_to_solve):
+            if not self.evaluate(network)['won']:
+                return False
+        return True
 
     def visualize(self, network):
         pass
