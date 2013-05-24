@@ -102,16 +102,17 @@ class CheckersTask(object):
     """ Represents a checkers game played by an evolved phenotype against
         a fixed opponent.
     """
-    def __init__(self, search_depth=4, opponent_search_depth=4, opponent_handicap=0.0, minefield=False, win_to_solve=3):
+    def __init__(self, search_depth=4, opponent_search_depth=4, opponent_handicap=0.0, minefield=False, fly_kings=True, win_to_solve=3):
         self.search_depth = search_depth
         self.opponent_search_depth = opponent_search_depth
         self.opponent_handicap = opponent_handicap
         self.win_to_solve = win_to_solve
         self.minefield = minefield
+        self.fly_kings = fly_kings
 
     def evaluate(self, network):
         # Setup
-        game = Checkers(minefield=self.minefield)
+        game = Checkers(minefield=self.minefield, fly_kings=self.fly_kings)
         player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)
         opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=self.opponent_search_depth, handicap=self.opponent_handicap)
         # Play the game
@@ -128,6 +129,49 @@ class CheckersTask(object):
             fitness.append(gamefitness(game))
             sys.stdout.write('.')
             sys.stdout.flush()
+        print game
+        score = sum(fitness)
+        won = game.winner() >= 1.0
+        if won:
+            score += 30000
+        print "\nGame finished in %d turns. Winner: %s. Score: %s" % (i,game.winner(), score)
+        return {'fitness':score, 'won': won}
+
+    def play_against(self, network):
+        # Setup
+        game = Checkers(minefield=self.minefield)
+        player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)
+        
+        # Play the game
+        fitness = [gamefitness(game)] * 100
+        
+        i = 0
+        print "Running checkers game..."
+        while not game.game_over():
+            i += 1
+            move = player.pickmove(game)
+            print move
+            game.play(move)
+
+            print game
+            print NUMBERING
+            print "enter move"
+            moved = False
+            while not moved:
+                try:
+                    user_input = raw_input()
+                    if 'q' in user_input:
+                        sys.exit()
+                    if ' ' in user_input:
+                        move = tuple(int(i) for i in user_input.split(' '))
+                    else:
+                        move = tuple(int(i) for i in user_input.split('-'))
+                    game.play(move)
+                    moved = True
+                except IllegalMoveError:
+                    print "Illegal move"
+            
+            
         print game
         score = sum(fitness)
         won = game.winner() >= 1.0
