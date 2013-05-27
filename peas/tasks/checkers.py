@@ -525,9 +525,10 @@ class Checkers(object):
         if start is None:
             start = (py, px)
         opponent = BLACK if piece & WHITE else WHITE
+        forward = [-1, 1] if piece & KING else [1] if piece & BLACK else [-1]
         # Look for capture moves
         for dx in [-1, 1]:
-            for dy in [-1, 1]:
+            for dy in forward:
                 jx, jy = px, py
                 while True:
                     jx += dx # Jumped square
