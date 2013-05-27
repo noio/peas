@@ -47,14 +47,12 @@ class IllegalMoveError(Exception):
     pass
 
 ### FUNCTIONS ###
-num_evals = 0
-def alphabeta(node, heuristic, player_max=True, depth=4, alpha=-inf, beta=inf, killer_moves=defaultdict(set)):
+def alphabeta(node, heuristic, player_max=True, depth=4, alpha=-inf, beta=inf, killer_moves=defaultdict(set), num_evals=[0]):
     """ Performs alphabeta search.
         From wikipedia pseudocode.
     """
     if depth == 0 or node.game_over():
-        global num_evals
-        num_evals += 1
+        num_evals[0] += 1
         return heuristic(node)
     pmx = not player_max
 
@@ -71,7 +69,7 @@ def alphabeta(node, heuristic, player_max=True, depth=4, alpha=-inf, beta=inf, k
     if player_max:
         for move in moves:
             newnode = node.copy_and_play(move)
-            alpha = max(alpha, alphabeta(newnode, heuristic, pmx, depth-1, alpha, beta, killer_moves))
+            alpha = max(alpha, alphabeta(newnode, heuristic, pmx, depth-1, alpha, beta, killer_moves, num_evals))
             if beta <= alpha:
                 if len(killers) > 4:
                     killers.pop()
@@ -81,7 +79,7 @@ def alphabeta(node, heuristic, player_max=True, depth=4, alpha=-inf, beta=inf, k
     else:
         for move in moves:
             newnode = node.copy_and_play(move)
-            beta = min(beta, alphabeta(newnode, heuristic, pmx, depth-1, alpha, beta, killer_moves))     
+            beta = min(beta, alphabeta(newnode, heuristic, pmx, depth-1, alpha, beta, killer_moves, num_evals))     
             if beta <= alpha:
                 if len(killers) > 4:
                     killers.pop()
@@ -116,7 +114,7 @@ class CheckersTask(object):
         player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)
         opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=self.opponent_search_depth, handicap=self.opponent_handicap)
         # Play the game
-        fitness = [gamefitness(game)] * 100
+        fitness = []
         current, next = player, opponent
         i = 0
         print "Running checkers game..."
@@ -125,11 +123,16 @@ class CheckersTask(object):
             move = current.pickmove(game)
             game.play(move)
             current, next = next, current
-            fitness.pop(0)
             fitness.append(gamefitness(game))
             sys.stdout.write('.')
             sys.stdout.flush()
+
+        print
         print game
+        # Fitness over last 100 episodes
+        fitness.extend([gamefitness(game)] * (100 - len(fitness)))
+        fitness = fitness[-100:]
+        print fitness
         score = sum(fitness)
         won = game.winner() >= 1.0
         if won:
@@ -200,7 +203,7 @@ class HeuristicOpponent(object):
         self.handicap = handicap
         self.killer_moves = defaultdict(set)
     
-    def pickmove(self, board):
+    def pickmove(self, board, verbose=False):
         player_max = board.to_move == BLACK
         bestmove = None
         secondbest = None
@@ -208,10 +211,12 @@ class HeuristicOpponent(object):
         moves = list(board.all_moves())
         # If there is only one possible move, don't search, just move.
         if len(moves) == 1:
+            if verbose: print "0 evals."
             return moves[0]
         for move in moves:
+            evals = [0]
             val = alphabeta(board.copy_and_play(move), self.heuristic.evaluate, 
-                depth=self.search_depth, player_max=player_max, killer_moves=self.killer_moves)
+                depth=self.search_depth, player_max=player_max, killer_moves=self.killer_moves, num_evals=evals)
             if player_max and val > bestval or not player_max and val < bestval:
                 bestval = val
                 secondbest = bestmove
@@ -219,6 +224,7 @@ class HeuristicOpponent(object):
         # Pick second best move
         if secondbest is not None and self.handicap > 0 and random.random() < self.handicap:
             return secondbest
+        if verbose: print "%d evals." % evals[0]
         return bestmove
 
 class SimpleHeuristic(object):
@@ -680,5 +686,4 @@ if __name__ == '__main__':
             
         scores.append(gamefitness(game))
     print (time.time() - tic) / n
-    print 'Evals: %d' % (num_evals / n)
     print 'Score', scores
