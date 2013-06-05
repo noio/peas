@@ -21,6 +21,7 @@ pi = np.pi
 ### CONSTANTS ###
 DATA_DIR = os.path.abspath(os.path.split(__file__)[0])
 
+
 ### FUNCTIONS ###
     
 def path_length(path):
@@ -40,13 +41,15 @@ class Robot(object):
                        size=8, 
                        motor_torque=6,
                        friction_scale=0.2,
-                       angular_damping=0.9):
+                       angular_damping=0.9,
+                       force_global=False):
         self.field_friction = field_friction
         self.field_observation = field_observation
         self.size = size
         self.friction_scale = friction_scale
         self.motor_torque = motor_torque
         self.angular_damping = angular_damping
+        self.force_global = force_global
         
         mass = size ** 2 * 0.2
         self.body = body = pymunk.Body(mass, pymunk.moment_for_box(mass, size, size))
@@ -102,7 +105,7 @@ class Robot(object):
         self.l, self.r = np.clip([l, r], -1, 1)
         self.l *= self.motor_torque
         self.r *= self.motor_torque
-        lw, rw = self.wheel_locations()
+        lw, rw = self.wheel_locations(not self.force_global)
         self.l = float(self.l)
         self.r = float(self.r)
         self.body.apply_impulse( self.l * self.body.rotation_vector, lw)
@@ -132,12 +135,14 @@ class LineFollowingTask(object):
                        damping=0.2,
                        initial_pos=None,
                        flush_each_step=False,
+                       force_global=False,
                        path_resolution=100,
                        check_coverage=False,
                        coverage_memory=20):
         # Settings
         self.max_steps = max_steps
         self.flush_each_step = flush_each_step
+        self.force_global = force_global
         self.fieldpath = os.path.join(DATA_DIR,field) + '.png'
         self.observationpath = os.path.join(DATA_DIR,observation) + '.png'
         print "Using %s" % (self.fieldpath,)
@@ -184,7 +189,8 @@ class LineFollowingTask(object):
 
         # Create objects
         robot = Robot(space, self.field_friction, self.field_observation, self.initial_pos,
-                             friction_scale=self.friction_scale, motor_torque=self.motor_torque)
+                             friction_scale=self.friction_scale, motor_torque=self.motor_torque,
+                             force_global=self.force_global)
     
         path = [(robot.body.position.int_tuple)]
         cells = []
@@ -226,11 +232,17 @@ class LineFollowingTask(object):
                 screen.blit(txt, (0,0))
                 # Draw path
                 if len(path) > 1:
-                    pygame.draw.lines(screen, (0,0,255), False, path, 2)
+                    pygame.draw.lines(screen, (0,0,255), False, path, 3)
+                for cell in cells:
+                    pygame.draw.rect(screen, (200,200,0), (cell[0]*32, cell[1]*32, 32, 32), 2)
                 robot.draw(screen)
                 
                 if pygame.event.get(pygame.QUIT):
                     break
+
+                for k in pygame.event.get(pygame.KEYDOWN):
+                    if k.key == pygame.K_SPACE:
+                        break
                 
                 pygame.display.flip()
                 # clock.tick(50)

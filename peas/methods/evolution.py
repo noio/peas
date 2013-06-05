@@ -188,6 +188,6 @@ class SimplePopulation(object):
     def _status_report(self):
         """ Prints a status report """
         print "\n== Generation %d ==" % self.generation
-        print "Best (%.2f): %s" % (self.champions[-1].stats['fitness'], self.champions[-1])
+        print "Best (%.2f): %s %s" % (self.champions[-1].stats['fitness'], self.champions[-1], self.champions[-1].stats)
         print "Solved: %s" % (self.solved_at)
         
