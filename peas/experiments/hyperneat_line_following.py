@@ -61,8 +61,19 @@ def run(method, setup, generations=100, popsize=100):
                          motor_torque=10,
                          check_coverage=False,
                          flush_each_step=True,
-                         force_global=True,
                          initial_pos=(282, 300, np.pi*0.35))
+
+    elif setup == 'force':
+        task_kwds = dict(field='eight',
+                         observation='eight',
+                         max_steps=3000,
+                         friction_scale=0.1,
+                         damping=0.9,
+                         motor_torque=3,
+                         check_coverage=True,
+                         flush_each_step=True,
+                         force_global=True,
+                         initial_pos=(17, 256, np.pi*0.5))
 
     elif setup == 'prop':
         task_kwds = dict(field='eight',
@@ -77,7 +88,7 @@ def run(method, setup, generations=100, popsize=100):
     
     elif setup == 'cover':
         task_kwds = dict(field='eight',
-                         observation='eight',
+                         observation='eight_striped',
                          max_steps=3000,
                          friction_scale=0.1,
                          damping=0.9,
@@ -143,9 +154,9 @@ def run(method, setup, generations=100, popsize=100):
 
 if __name__ == '__main__':
 	# Method is one of METHOD = ['wvl', 'nhn', '0hnmax', '1hnmax']
-    reswvl = run('wvl', 'hard', 1, 2)
-    resnhn = run('nhn', 'hard', 1, 2)
+    reswvl = run('wvl', 'hard', 20)
+    resnhn = run('nhn', 'hard', 20)
 
-    print [c.stats['speed'] for c in reswvl.champions]
-    print [c.stats['speed'] for c in resnhn.champions]
+    print [c.stats['speed'] for c in reswvl['champions']]
+    print [c.stats['speed'] for c in resnhn['champions']]
 
