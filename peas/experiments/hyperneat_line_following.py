@@ -61,6 +61,7 @@ def run(method, setup, generations=100, popsize=100):
                          motor_torque=10,
                          check_coverage=False,
                          flush_each_step=True,
+                         force_global=True,
                          initial_pos=(282, 300, np.pi*0.35))
 
     elif setup == 'force':
@@ -154,9 +155,4 @@ def run(method, setup, generations=100, popsize=100):
 
 if __name__ == '__main__':
 	# Method is one of METHOD = ['wvl', 'nhn', '0hnmax', '1hnmax']
-    reswvl = run('wvl', 'hard', 20)
-    resnhn = run('nhn', 'hard', 20)
-
-    print [c.stats['speed'] for c in reswvl['champions']]
-    print [c.stats['speed'] for c in resnhn['champions']]
-
+    resnhn = run('nhn', 'hard')
