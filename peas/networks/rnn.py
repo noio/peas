@@ -5,7 +5,7 @@
 
 import sys
 import numpy as np
-np.seterr(over='warn', divide='raise')
+np.seterr(over='ignore', divide='raise')
 
 # Libraries
 
