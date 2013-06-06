@@ -250,6 +250,7 @@ class LineFollowingTask(object):
         if draw:
             pygame.quit()
             
+        self.last_path = path
         dist = path_length(path)
         speed = dist / self.max_steps
         return {'fitness':1 + dist**2, 'dist':dist, 'speed':speed}
@@ -260,7 +261,19 @@ class LineFollowingTask(object):
         
     def visualize(self, network, filename=None):
         """ Visualize a solution strategy by the given individual. """
-        self.evaluate(network, draw=True, drawname=filename)
+        import matplotlib.pyplot as plt
+        self.evaluate(network, draw=False, drawname=filename)
+        print "Saving as " + os.path.join(os.getcwd(), filename)
+        plt.figure()
+        plt.imshow(self.field_friction * 0.2, cmap='Greys', vmin=0, vmax=1)
+        for i in range(len(self.last_path)-1):
+            plt.plot(*zip(*self.last_path[i:i+2]), lw=4, alpha=0.3, color=(0.3,0,0.8))
+        plt.ylim(0,512)
+        plt.xlim(0,512)
+        plt.axis('off')
+        plt.savefig(filename, bbox_inches='tight', pad_inches=0)
+
+
         
 
 if __name__ == '__main__':
