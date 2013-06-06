@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """ Implements a 'wavelets' genotype, that encodes
     locations and scales of wavelets for building a connectivity
     matrix.
@@ -16,11 +18,17 @@ from ..networks.rnn import NeuralNetwork
 
 # Shortcuts
 rand = np.random.random
+two_pi = np.pi * 2
+exp = np.exp
+sin = np.sin
 
 ### FUNCTIONS ###
 
 def gabor(x, y, l=1.0, psi=np.pi/2, sigma=0.5, gamma=1.0):
     return np.exp(-(x**2 + (gamma*y)**2)/(2*sigma**2)) * np.cos(2*np.pi*x/l + psi)
+
+def gabor_opt(x, y, sigma=0.5):
+    return exp(-(x ** 2 + y ** 2) / (2 * sigma ** 2)) * -sin(two_pi * x) 
 
 
 def transform_meshgrid(x, y, mat):
@@ -122,7 +130,7 @@ class WaveletDeveloper(object):
         for (i,j), coords, conn_id, expr_id in self.substrate.get_connection_list(self.add_deltas):
             # Add a bias (translation)
             coords = np.hstack((coords, [1]))
-            w = sum(weight * gabor(*(np.dot(mat, coords)), sigma=sigma) 
+            w = sum(weight * gabor_opt(*(np.dot(mat, coords)), sigma=sigma) 
                     for (weight, sigma, mat) in individual.wavelets[conn_id])
             cm[j,i] = w
         
@@ -131,6 +139,7 @@ class WaveletDeveloper(object):
         cm -= (np.sign(cm) * self.min_weight)
         cm *= self.weight_range / (self.weight_range - self.min_weight)
         
+
         # Clip highest weights
         cm = np.clip(cm, -self.weight_range, self.weight_range)
         net = NeuralNetwork().from_matrix(cm, node_types=[self.node_type])
@@ -145,4 +154,5 @@ class WaveletDeveloper(object):
         
         
 if __name__ == '__main__':
-    pass
+    x, y = np.meshgrid(np.linspace(0,6,4), np.linspace(0,6,4))
+    print x, y

@@ -56,8 +56,8 @@ def summed(fn):
 ### CONSTANTS ###
 
 SIMPLE_NODE_FUNCS = {
-    'sin': sin,
-    'abs': abs,
+    'sin': np.sin,
+    'abs': np.abs,
     'ident': ident,
     'linear': ident,
     'bound': bound,
