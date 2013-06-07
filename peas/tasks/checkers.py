@@ -189,8 +189,22 @@ class CheckersTask(object):
                 return False
         return True
 
-    def visualize(self, network):
-        pass
+    def visualize(self, network, filename):
+        import matplotlib.pyplot as plt
+        output = NUMBERING.copy() * 0.0
+        for y in range(8):
+            for x in range(8):
+                inpt = NUMBERING.copy() * 0
+                inpt[y,x] = 1
+                value = network.feed(inpt, add_bias=False, propagate=2)[-1]
+                output[y,x] = value
+        plt.imshow(output, vmin=-1, vmax=1, interpolation='nearest', extent=[0,8,0,8])
+        plt.grid(zorder=2)
+        plt.savefig(filename)
+        print filename
+        plt.close()
+            
+
 
         
 class HeuristicOpponent(object):
@@ -433,7 +447,6 @@ class NetworkHeuristic(object):
                       (game.board == BLACK | KING) * 0.75 +
                       (game.board == WHITE | KING) * -0.75)
         # Feed twice to propagate through 3 layer network:
-        value = self.network.feed(net_inputs, add_bias=False, propagate=2)
         # print value
         return value[-1]
 
