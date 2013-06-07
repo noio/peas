@@ -155,4 +155,7 @@ def run(method, setup, generations=100, popsize=100):
 
 if __name__ == '__main__':
 	# Method is one of METHOD = ['wvl', 'nhn', '0hnmax', '1hnmax']
-    resnhn = run('nhn', 'hard')
+    resnhn = run('nhn', 'hard', 20)
+    reswvl = run('wvl', 'hard', 20)
+    print [c.stats['speed'] for c in reswvl['champions']]
+    print [c.stats['speed'] for c in resnhn['champions']]
