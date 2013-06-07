@@ -105,7 +105,10 @@ class Robot(object):
         self.l, self.r = np.clip([l, r], -1, 1)
         self.l *= self.motor_torque
         self.r *= self.motor_torque
-        lw, rw = self.wheel_locations(not self.force_global)
+        if not self.force_global:
+            lw, rw = self.wheel_locations()
+        else:
+            lw, rw = (0, -self.size / 2), (0, self.size / 2)
         self.l = float(self.l)
         self.r = float(self.r)
         self.body.apply_impulse( self.l * self.body.rotation_vector, lw)
@@ -265,13 +268,14 @@ class LineFollowingTask(object):
         self.evaluate(network, draw=False, drawname=filename)
         print "Saving as " + os.path.join(os.getcwd(), filename)
         plt.figure()
-        plt.imshow(self.field_friction * 0.2, cmap='Greys', vmin=0, vmax=1)
+        plt.imshow(self.field_observation * 0.2, cmap='Greys', vmin=0, vmax=1)
         for i in range(len(self.last_path)-1):
             plt.plot(*zip(*self.last_path[i:i+2]), lw=4, alpha=0.3, color=(0.3,0,0.8))
         plt.ylim(0,512)
         plt.xlim(0,512)
         plt.axis('off')
         plt.savefig(filename, bbox_inches='tight', pad_inches=0)
+        plt.close()
 
 
         
