@@ -33,6 +33,7 @@ class NEATGenotype(object):
     def __init__(self, 
                  inputs=2, 
                  outputs=1, 
+                 output_type=None,
                  types=['tanh'],
                  topology=None,
                  feedforward=True,
@@ -64,6 +65,8 @@ class NEATGenotype(object):
         # Settings
         self.inputs = inputs
         self.outputs = outputs
+        #: Note that if you set the output type, it can still be mutated if prob_mutate_type > 0.
+        self.output_type = output_type
         
         # Restrictions
         self.types = types
@@ -122,8 +125,9 @@ class NEATGenotype(object):
             
             # Create output nodes
             for i in xrange(self.outputs):
-                self.node_genes.append( [(self.inputs + i) * 1024.0, random.choice(self.types), 
-                                            0.0, self.response_default, max_layer] )
+                self.node_genes.append( [(self.inputs + i) * 1024.0, 
+                                         random.choice(self.types) if self.output_type is None else self.output_type, 
+                                         0.0, self.response_default, max_layer] )
             
             # Create connections from each input to each output
             innov = 0

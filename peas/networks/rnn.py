@@ -26,6 +26,9 @@ def ident(x):
 def bound(x, clip=(-1.0, 1.0)):
     return np.clip(x, *clip)
 
+def bound2(x):
+    return np.clip(x / 3.0, -1.0, 1.0)
+
 def gauss(x):
     """ Returns the pdf of a gaussian.
     """
@@ -61,6 +64,7 @@ SIMPLE_NODE_FUNCS = {
     'ident': ident,
     'linear': ident,
     'bound': bound,
+    'bound2': bound,
     'gauss': gauss,
     'sigmoid': sigmoid,
     'sigmoid2': sigmoid2,
