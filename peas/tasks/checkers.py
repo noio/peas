@@ -138,7 +138,7 @@ class CheckersTask(object):
         if won:
             score += 30000
         print "\nGame finished in %d turns. Winner: %s. Score: %s" % (i,game.winner(), score)
-        return {'fitness':score, 'won': won}
+        return {'fitness':score, 'won': won, 'turns': i}
 
     def play_against(self, network):
         # Setup
@@ -198,7 +198,7 @@ class CheckersTask(object):
                 inpt[y,x] = 1
                 value = network.feed(inpt, add_bias=False, propagate=2)[-1]
                 output[y,x] = value
-        plt.imshow(output, vmin=-1, vmax=1, interpolation='nearest', extent=[0,8,0,8])
+        plt.imshow(output, vmin=-1, vmax=1, interpolation='nearest', extent=[0,8,0,8], cmap='RdYlGn')
         plt.grid(zorder=2)
         plt.savefig(filename)
         print filename
