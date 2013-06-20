@@ -205,7 +205,6 @@ class CheckersTask(object):
         plt.close()
             
 
-
         
 class HeuristicOpponent(object):
     """ Opponent that utilizes a heuristic combined with alphabeta search
@@ -447,7 +446,7 @@ class NetworkHeuristic(object):
                       (game.board == BLACK | KING) * 0.75 +
                       (game.board == WHITE | KING) * -0.75)
         # Feed twice to propagate through 3 layer network:
-        # print value
+        value = self.network.feed(net_inputs, add_bias=False, propagate=2)
         return value[-1]
 
 class RandomOpponent(object):
