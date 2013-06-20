@@ -260,7 +260,7 @@ class LineFollowingTask(object):
         
     def solve(self, network):
         stats = self.evaluate(network)
-        return stats['speed'] > 0.20
+        return stats['speed'] > 0.50
         
     def visualize(self, network, filename=None):
         """ Visualize a solution strategy by the given individual. """
