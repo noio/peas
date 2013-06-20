@@ -146,15 +146,16 @@ class CheckersTask(object):
         # Setup
         game = Checkers(minefield=self.minefield)
         # self.search_depth = 0
-        player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)
-        
+        player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)        
         player.play_against(game)
 
-
     def solve(self, network):
+        o = self.opponent_handicap
+        self.opponent_handicap = 0.1
         for _ in range(self.win_to_solve):
             if not self.evaluate(network)['won']:
                 return False
+        self.opponent_handicap = o
         return True
 
     def visualize(self, network, filename):
