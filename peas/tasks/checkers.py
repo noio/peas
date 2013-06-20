@@ -152,7 +152,7 @@ class CheckersTask(object):
         print "Running checkers game..."
         while not game.game_over():
             i += 1
-            move = player.pickmove(game)
+            move = player.pickmove(game, verbose=True)
             print move
             game.play(move)
 
@@ -502,7 +502,7 @@ class Checkers(object):
             for (n, (y, x), piece) in pieces:
                 # MAN moves
                 if piece & MAN:
-                    nextrow = y + 1 if self.to_move == BLACK else y - 1
+                    nextrow = y + 1 if (self.to_move == BLACK) else y - 1
                     if 0 <= nextrow < 8:
                         if x - 1 >= 0 and self.board[nextrow, x - 1] == EMPTY:
                             yield (n, NUMBERING[nextrow, x - 1])
