@@ -53,7 +53,9 @@ def alphabeta(node, heuristic, player_max=True, depth=4, alpha=-inf, beta=inf, k
     """
     if depth == 0 or node.game_over():
         num_evals[0] += 1
-        return heuristic(node)
+        value = heuristic(node)
+        # print  "[%s] %.3f" % ("+" if player_max else "-", value)
+        return value
     pmx = not player_max
 
     killers = killer_moves[node.turn+1]
@@ -143,45 +145,11 @@ class CheckersTask(object):
     def play_against(self, network):
         # Setup
         game = Checkers(minefield=self.minefield)
+        # self.search_depth = 0
         player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)
         
-        # Play the game
-        fitness = [gamefitness(game)] * 100
-        
-        i = 0
-        print "Running checkers game..."
-        while not game.game_over():
-            i += 1
-            move = player.pickmove(game, verbose=True)
-            print move
-            game.play(move)
+        player.play_against(game)
 
-            print game
-            print NUMBERING
-            print "enter move"
-            moved = False
-            while not moved:
-                try:
-                    user_input = raw_input()
-                    if 'q' in user_input:
-                        sys.exit()
-                    if ' ' in user_input:
-                        move = tuple(int(i) for i in user_input.split(' '))
-                    else:
-                        move = tuple(int(i) for i in user_input.split('-'))
-                    game.play(move)
-                    moved = True
-                except IllegalMoveError:
-                    print "Illegal move"
-            
-            
-        print game
-        score = sum(fitness)
-        won = game.winner() >= 1.0
-        if won:
-            score += 30000
-        print "\nGame finished in %d turns. Winner: %s. Score: %s" % (i,game.winner(), score)
-        return {'fitness':score, 'won': won}
 
     def solve(self, network):
         for _ in range(self.win_to_solve):
@@ -218,6 +186,8 @@ class HeuristicOpponent(object):
     
     def pickmove(self, board, verbose=False):
         player_max = board.to_move == BLACK
+        if verbose:
+            print "Picking move for player %s" % ("MAX" if player_max else "MIN")
         bestmove = None
         secondbest = None
         bestval = -inf if player_max else inf
@@ -226,20 +196,57 @@ class HeuristicOpponent(object):
         if len(moves) == 1:
             if verbose: print "0 evals."
             return moves[0]
+        evals = [0]
         for move in moves:
-            evals = [0]
             val = alphabeta(board.copy_and_play(move), self.heuristic.evaluate, 
-                depth=self.search_depth, player_max=player_max, killer_moves=self.killer_moves, num_evals=evals)
+                depth=self.search_depth, player_max=not player_max, killer_moves=self.killer_moves, num_evals=evals)
+            if verbose: 
+                print board.copy_and_play(move)
+                print "Value: %.3f" % val
             if player_max and val > bestval or not player_max and val < bestval:
                 bestval = val
                 secondbest = bestmove
                 bestmove = move
         # Pick second best move
+        if verbose: 
+            print "%d evals. value: %.2f" % (evals[0], bestval)
         if secondbest is not None and self.handicap > 0 and random.random() < self.handicap:
             return secondbest
-        if verbose: print "%d evals." % evals[0]
         return bestmove
 
+    def play_against(self, game=None):
+        if game is None:
+            game = Checkers()
+        i = 0
+        print "Running checkers game..."
+        while not game.game_over():
+            i += 1
+            move = self.pickmove(game, verbose=True)
+            print move
+            game.play(move)
+
+            print game
+            print NUMBERING
+            print "enter move"
+            moved = False
+            while not moved:
+                try:
+                    user_input = raw_input()
+                    if 'q' in user_input:
+                        sys.exit()
+                    if ' ' in user_input:
+                        move = tuple(int(i) for i in user_input.split(' '))
+                    else:
+                        move = tuple(int(i) for i in user_input.split('-'))
+                    game.play(move)
+                    moved = True
+                except IllegalMoveError:
+                    print "Illegal move"
+            
+        print game
+        won = game.winner() >= 1.0
+        print "\nGame finished in %d turns. Winner: %s. Score: %s" % (i,game.winner(), score)
+        
 class SimpleHeuristic(object):
     """ Simple piece/position counting heuristic, adapted from simplech
     """
@@ -597,7 +604,7 @@ class Checkers(object):
         piece = self.board[ly, lx]
         self.board[ly, lx] = EMPTY
         # Check if the piece needs to be crowned
-        if piece & BLACK and py == 7 or piece & WHITE and py == 0:
+        if (piece & MAN) and ((piece & BLACK and py == 7) or (piece & WHITE and py == 0)):
             piece = piece ^ MAN | KING
         self.board[py, px] = piece
 
@@ -662,41 +669,6 @@ class Checkers(object):
 ### PROCEDURE ###
 
 if __name__ == '__main__':
-    scores = []
-    n = 3
-    tic = time.time()
-    for i in range(n):
-        game = Checkers(fly_kings=False)
-        player = None
-        # opponent = HeuristicOpponent(PieceCounter())
-        opponent = HeuristicOpponent(SimpleHeuristic())
-        # Play the game
-        current, next = player, opponent
-        i = 0
-        while not game.game_over():
-            i += 1
-            print game
-            print NUMBERING
-            print "enter move"
-            moved = False
-            while not moved:
-                try:
-                    user_input = raw_input()
-                    if 'q' in user_input:
-                        sys.exit()
-                    if ' ' in user_input:
-                        move = tuple(int(i) for i in user_input.split(' '))
-                    else:
-                        move = tuple(int(i) for i in user_input.split('-'))
-                    game.play(move)
-                    moved = True
-                except IllegalMoveError:
-                    print "Illegal move"
-
-            move = opponent.pickmove(game)
-            print move
-            game.play(move)
-            
-        scores.append(gamefitness(game))
-    print (time.time() - tic) / n
-    print 'Score', scores
+    opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=1)
+    opponent.play_against()
+    
