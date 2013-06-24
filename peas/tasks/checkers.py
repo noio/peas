@@ -54,7 +54,7 @@ def alphabeta(node, heuristic, player_max=True, depth=4, alpha=-inf, beta=inf, k
     if depth == 0 or node.game_over():
         num_evals[0] += 1
         value = heuristic(node)
-        # print  "[%s] %.3f" % ("+" if player_max else "-", value)
+        # print "[%s] %.3f" % ("+" if player_max else "-", value),
         return value
     pmx = not player_max
 
@@ -102,7 +102,7 @@ class CheckersTask(object):
     """ Represents a checkers game played by an evolved phenotype against
         a fixed opponent.
     """
-    def __init__(self, search_depth=4, opponent_search_depth=4, opponent_handicap=0.0, minefield=False, fly_kings=True, win_to_solve=3):
+    def __init__(self, search_depth=4, opponent_search_depth=4, opponent_handicap=0.0, minefield=False, fly_kings=False, win_to_solve=3):
         self.search_depth = search_depth
         self.opponent_search_depth = opponent_search_depth
         self.opponent_handicap = opponent_handicap
@@ -142,12 +142,12 @@ class CheckersTask(object):
         print "\nGame finished in %d turns. Winner: %s. Score: %s" % (i,game.winner(), score)
         return {'fitness':score, 'won': won, 'turns': i}
 
-    def play_against(self, network):
+    def play_against(self, network, user_side=WHITE):
         # Setup
         game = Checkers(minefield=self.minefield)
         # self.search_depth = 0
         player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)        
-        player.play_against(game)
+        player.play_against(game, user_side=user_side)
 
     def solve(self, network):
         o = self.opponent_handicap
@@ -186,7 +186,7 @@ class HeuristicOpponent(object):
         self.killer_moves = defaultdict(set)
     
     def pickmove(self, board, verbose=False):
-        player_max = board.to_move == BLACK
+        player_max = (board.to_move == BLACK)
         if verbose:
             print "Picking move for player %s" % ("MAX" if player_max else "MIN")
         bestmove = None
@@ -200,11 +200,11 @@ class HeuristicOpponent(object):
         evals = [0]
         for move in moves:
             val = alphabeta(board.copy_and_play(move), self.heuristic.evaluate, 
-                depth=self.search_depth, player_max=not player_max, killer_moves=self.killer_moves, num_evals=evals)
+                depth=self.search_depth-1, player_max=not player_max, killer_moves=self.killer_moves, num_evals=evals)
             if verbose: 
                 print board.copy_and_play(move)
                 print "Value: %.3f" % val
-            if player_max and val > bestval or not player_max and val < bestval:
+            if (player_max and val > bestval) or (not player_max and val < bestval):
                 bestval = val
                 secondbest = bestmove
                 bestmove = move
@@ -215,27 +215,34 @@ class HeuristicOpponent(object):
             return secondbest
         return bestmove
 
-    def play_against(self, game=None):
+    def play_against(self, game=None, user_side=WHITE):
         if game is None:
             game = Checkers()
         i = 0
         print "Running checkers game..."
+        auto = HeuristicOpponent(SimpleHeuristic(), search_depth=4)
+
         while not game.game_over():
-            i += 1
-            move = self.pickmove(game, verbose=True)
-            print move
-            game.play(move)
+            # Computer plays first if user is white.
+            if i > 0 or user_side == WHITE:
+                move = self.pickmove(game, verbose=True)
+                print move
+                game.play(move)
+
+            if game.game_over():
+                break
 
             print game
-            print NUMBERING
-            print "enter move"
+            print "Enter move:",
             moved = False
             while not moved:
                 try:
                     user_input = raw_input()
-                    if 'q' in user_input:
+                    if 'a' in user_input:
+                        move = auto.pickmove(game)
+                    elif 'q' in user_input:
                         sys.exit()
-                    if ' ' in user_input:
+                    elif ' ' in user_input:
                         move = tuple(int(i) for i in user_input.split(' '))
                     else:
                         move = tuple(int(i) for i in user_input.split('-'))
@@ -243,10 +250,13 @@ class HeuristicOpponent(object):
                     moved = True
                 except IllegalMoveError:
                     print "Illegal move"
+            print game
+            time.sleep(1.0)
+            i += 1
             
         print game
         won = game.winner() >= 1.0
-        print "\nGame finished in %d turns. Winner: %s. Score: %s" % (i,game.winner(), score)
+        print "\nGame finished in %d turns. Winner: %s." % (i,game.winner())
         
 class SimpleHeuristic(object):
     """ Simple piece/position counting heuristic, adapted from simplech
@@ -466,7 +476,7 @@ class Checkers(object):
     """ Represents the checkers game(state)
     """
 
-    def __init__(self, non_capture_draw=30, fly_kings=True, minefield=False):
+    def __init__(self, non_capture_draw=30, fly_kings=False, minefield=False):
         """ Initialize the game board. """
         self.non_capture_draw = non_capture_draw
 
@@ -522,7 +532,7 @@ class Checkers(object):
                         for dy in [-1, 1]:                
                             dist = 1
                             while True:
-                                tx, ty = x + (dist + 1) * dx, y + (dist + 1) * dy # Target square
+                                tx, ty = x + dist * dx, y + dist * dy # Target square
                                 if not ((0 <= tx < 8 and 0 <= ty < 8) and self.board[ty, tx] == EMPTY):
                                     break
                                 else:
@@ -664,12 +674,15 @@ class Checkers(object):
             s[0,7] = 'v'
         else:
             s[7,0] = '^'
-        s = '\n'.join(' '.join(l) for l in s)
-        return s
+        n = [''.join(('%2d' % n) if (n > 0) else '  ' for n in row) for row in NUMBERING]
+        s = [' '.join(l) for l in s]
+        o = ['   %s   ||   %s' % line for line in zip(s, n)]
+        o = '\n'.join(o[::-1])
+        return o
     
 ### PROCEDURE ###
 
 if __name__ == '__main__':
-    opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=1)
-    opponent.play_against()
+    opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=4)
+    opponent.play_against(user_side=BLACK)
     
