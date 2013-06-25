@@ -129,6 +129,8 @@ class CheckersTask(object):
             sys.stdout.write('.')
             sys.stdout.flush()
 
+        if ((game.board & WHITE).sum() == 0 or (game.board & BLACK).sum() == 0) and game.winner() == 0:
+            raise Exception("Can't be draw.")
         print
         print game
         # Fitness over last 100 episodes
@@ -225,7 +227,7 @@ class HeuristicOpponent(object):
         while not game.game_over():
             # Computer plays first if user is white.
             if i > 0 or user_side == WHITE:
-                move = self.pickmove(game, verbose=True)
+                move = self.pickmove(game, verbose=False)
                 print move
                 game.play(move)
 
@@ -241,15 +243,18 @@ class HeuristicOpponent(object):
                     if 'a' in user_input:
                         move = auto.pickmove(game)
                     elif 'q' in user_input:
-                        sys.exit()
+                        move = None
                     elif ' ' in user_input:
                         move = tuple(int(i) for i in user_input.split(' '))
                     else:
                         move = tuple(int(i) for i in user_input.split('-'))
-                    game.play(move)
+                    if move is not None:
+                        game.play(move)
                     moved = True
-                except IllegalMoveError:
+                except (IllegalMoveError, ValueError):
                     print "Illegal move"
+            if move is None:
+                break
             print game
             time.sleep(1.0)
             i += 1
@@ -263,7 +268,7 @@ class SimpleHeuristic(object):
     """
     def evaluate(self, game):
         if game.game_over():
-            return -5000 if game.to_move == BLACK else 5000
+            return 5000 * game.winner()
         board = game.board
         counts = np.bincount(board.flat)
 
@@ -457,7 +462,7 @@ class NetworkHeuristic(object):
 
     def evaluate(self, game):
         if game.game_over():
-            return -5000 if game.to_move == BLACK else 5000
+            return 5000 * game.winner()
 
         net_inputs = ((game.board == BLACK | MAN) * 0.5 +
                       (game.board == WHITE | MAN) * -0.5 +
@@ -476,15 +481,15 @@ class Checkers(object):
     """ Represents the checkers game(state)
     """
 
-    def __init__(self, non_capture_draw=30, fly_kings=False, minefield=False):
+    def __init__(self, no_advance_draw=50, fly_kings=False, minefield=False):
         """ Initialize the game board. """
-        self.non_capture_draw = non_capture_draw
+        self.no_advance_draw = no_advance_draw
 
         self.board = NUMBERING.copy() #: The board state
         self.to_move = BLACK          #: Whose move it is
         self.turn = 0
         self.history = []
-        self.caphistory = []
+        self.advancement = []
         self.minefield = minefield
         self.fly_kings = fly_kings
 
@@ -608,12 +613,14 @@ class Checkers(object):
                         stone_dies = True
                     capture = True
             (ly, lx) = (py, px)
-        self.caphistory.append(capture)
         # Move the piece
         (ly, lx) = positions[0]
         (py, px) = positions[-1]
         piece = self.board[ly, lx]
         self.board[ly, lx] = EMPTY
+        # The game advances if a pieces is captured, or if a man moves
+        # towards the kings row.
+        self.advancement.append(capture or (piece & MAN))
         # Check if the piece needs to be crowned
         if (piece & MAN) and ((piece & BLACK and py == 7) or (piece & WHITE and py == 0)):
             piece = piece ^ MAN | KING
@@ -633,14 +640,14 @@ class Checkers(object):
         return self.copy().play(move)
 
     def check_draw(self, verbose=False):
-        # If there were no captures in the last [30] moves, draw.
+        # If there were no captures in the last [50] moves, draw.
         i = 0
-        for i in xrange(len(self.caphistory)):
-            if self.caphistory[-(i+1)]:
+        for i in xrange(len(self.advancement)):
+            if self.advancement[-(i+1)]:
                 break
         if verbose:
             print "Last capture: %d turns ago." % (i)
-        return (i > self.non_capture_draw)
+        return (i > self.no_advance_draw)
         
     def game_over(self):
         """ Whether the game is over. """
@@ -664,7 +671,7 @@ class Checkers(object):
         new.board = self.board.copy()       # Copy the board explicitly
         new._moves = copy.copy(self._moves) # Shallow copy is enough.
         new.history = self.history[:]
-        new.caphistory = self.caphistory[:]
+        new.advancement = self.advancement[:]
         return new
 
     def __str__(self):
