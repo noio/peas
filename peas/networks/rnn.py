@@ -217,6 +217,8 @@ class NeuralNetwork(object):
             if any(conn[n]):
                 longest[n] = max(longest[conn[n]]) + 1
         self.effective_depth = max(longest)
+        if self.effective_depth < 1 or self.effective_depth > len(self.node_types):
+            raise Exception("Effective depth cannot exceed node count.")
         
     def flush(self):
         """ Reset activation values. """
