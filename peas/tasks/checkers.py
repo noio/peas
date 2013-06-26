@@ -546,15 +546,16 @@ class Checkers(object):
     def all_moves(self):
         if self._moves is None:
             self._moves = list(self.generate_moves())
-        if len(self.history) > self.max_repeat_moves * 4:
+        # Remove repeated moves
+        if (len(self.history) > self.max_repeat_moves * 4 and 
+            len(self._moves) > 1 and
+            self.history[-4] in self._moves):
             for i in range(self.max_repeat_moves):
                 if (self.history[-2 - 4 * i] != self.history[-2 - 4 * (i+1)]):
                     break
             if i == self.max_repeat_moves - 1:
-                print "CYCLE!" + str(self.history)
-                if self.history[-2] in self._moves:
-                    self._moves.remove(self.history[-2])
-                    print "REMOVED" + str(self.history[-2])
+                self._moves.remove(self.history[-4])
+                # print "REMOVED" + str(self.history[-4])
         return self._moves
                        
     def generate_moves(self):
