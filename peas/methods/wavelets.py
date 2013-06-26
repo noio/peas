@@ -49,6 +49,7 @@ class WaveletGenotype(object):
     
     def __init__(self, inputs, layers=1,
                  prob_add=0.1,
+                 prob_mutate_bias=0.0,
                  prob_modify=0.3,
                  stdev_mutate=0.1,
                  add_initial_uniform=False,
@@ -56,9 +57,11 @@ class WaveletGenotype(object):
         # Instance vars
         self.inputs       = inputs
         self.prob_add     = prob_add
+        self.prob_mutate_bias = prob_mutate_bias
         self.prob_modify  = prob_modify
         self.stdev_mutate = stdev_mutate
         self.wavelets     = [[]] * layers # Each defined by an affine matrix.
+        self.bias = 0.0
         
         for _ in xrange(initial):
             for l in xrange(layers):
@@ -87,14 +90,16 @@ class WaveletGenotype(object):
     
     def mutate(self):
         """ Mutate this individual """
+        if rand() < self.prob_mutate_bias:
+            self.bias += np.random.normal(0, self.stdev_mutate)
         if rand() < self.prob_add:
             self.add_wavelet()
         else:   
             for layer in self.wavelets:
                 for wavelet in layer:
                     if rand() < self.prob_modify:
-                        wavelet[0] += np.random.normal(self.stdev_mutate)
-                        wavelet[1] += np.random.normal(self.stdev_mutate)
+                        wavelet[0] += np.random.normal(0, self.stdev_mutate)
+                        wavelet[1] += np.random.normal(0, self.stdev_mutate)
                         wavelet[2] += np.random.normal(0, self.stdev_mutate, wavelet[2].shape)
                 
         return self # for chaining
@@ -132,6 +137,7 @@ class WaveletDeveloper(object):
             coords = np.hstack((coords, [1]))
             w = sum(weight * gabor_opt(*(np.dot(mat, coords)), sigma=sigma) 
                     for (weight, sigma, mat) in individual.wavelets[conn_id])
+            w += individual.bias
             cm[j,i] = w
         
         # Rescale weights

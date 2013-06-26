@@ -521,7 +521,7 @@ class Checkers(object):
     """ Represents the checkers game(state)
     """
 
-    def __init__(self, no_advance_draw=50, fly_kings=False, minefield=False, max_repeat_moves=3):
+    def __init__(self, no_advance_draw=50, fly_kings=False, minefield=False, max_repeat_moves=1000):
         """ Initialize the game board. """
         self.no_advance_draw = no_advance_draw
 
