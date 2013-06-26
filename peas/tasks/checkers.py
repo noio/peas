@@ -148,12 +148,11 @@ class CheckersTask(object):
         # Fitness over last 100 episodes
         fitness.extend([gamefitness(game)] * (100 - len(fitness)))
         fitness = fitness[-100:]
-        print fitness
         score = sum(fitness)
         won = game.winner() >= 1.0
         if won:
             score += 30000
-        print "\nGame finished in %d turns. Winner: %s. Score: %s" % (i,game.winner(), score)
+        print "\nGame finished in %d turns. Winner: %s. Score: %d. Final state fitness: %d." % (i,game.winner(), score, fitness[-1])
         return {'fitness':score, 'won': won, 'turns': i, '_move_history': game.history[:]}
 
     def play_against(self, network, user_side=WHITE, history=None):

@@ -212,13 +212,13 @@ class NeuralNetwork(object):
         self.cm[np.triu_indices(self.cm.shape[0])] = 0
         # Compute effective depth:
         conn = np.nan_to_num(self.cm) != 0
-        longest = np.zeros(conn.shape[:1], dtype=int)
-        for n in xrange(len(conn)):
+        longest = np.ones(conn.shape[:1], dtype=int)
+        for n in xrange(conn.shape[0]):
             if any(conn[n]):
                 longest[n] = max(longest[conn[n]]) + 1
         self.effective_depth = max(longest)
-        if self.effective_depth < 1 or self.effective_depth > len(self.node_types):
-            raise Exception("Effective depth cannot exceed node count.")
+        if self.effective_depth > len(self.node_types):
+            raise Exception("Effective depth (%d) cannot exceed node count (%d)." % (self.effective_depth, len(self.node_types)))
         
     def flush(self):
         """ Reset activation values. """
