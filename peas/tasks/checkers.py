@@ -102,10 +102,17 @@ class CheckersTask(object):
     """ Represents a checkers game played by an evolved phenotype against
         a fixed opponent.
     """
-    def __init__(self, search_depth=4, opponent_search_depth=4, opponent_handicap=0.0, minefield=False, fly_kings=False, win_to_solve=3):
+    def __init__(self, search_depth=4, 
+                       opponent='simplech', 
+                       opponent_search_depth=4, 
+                       opponent_handicap=0.0, 
+                       minefield=False, 
+                       fly_kings=False, 
+                       win_to_solve=3):
         self.search_depth = search_depth
         self.opponent_search_depth = opponent_search_depth
         self.opponent_handicap = opponent_handicap
+        self.opponent = opponent
         self.win_to_solve = win_to_solve
         self.minefield = minefield
         self.fly_kings = fly_kings
@@ -114,12 +121,17 @@ class CheckersTask(object):
         # Setup
         game = Checkers(minefield=self.minefield, fly_kings=self.fly_kings)
         player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)
-        opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=self.opponent_search_depth, handicap=self.opponent_handicap)
+        if self.opponent == 'simplech':
+            opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=self.opponent_search_depth, handicap=self.opponent_handicap)
+        elif self.opponent == 'counter':
+            opponent = HeuristicOpponent(PieceCounter(), search_depth=self.opponent_search_depth, handicap=self.opponent_handicap)
+        elif self.opponent == 'random':
+            opponent = RandomOpponent()
         # Play the game
         fitness = []
         current, next = player, opponent
         i = 0
-        print "Running checkers game..."
+        print "Running checkers game between %s - %s " % (player, opponent)
         while not game.game_over():
             i += 1
             move = current.pickmove(game)
@@ -130,7 +142,7 @@ class CheckersTask(object):
             sys.stdout.flush()
 
         if ((game.board & WHITE).sum() == 0 or (game.board & BLACK).sum() == 0) and game.winner() == 0:
-            raise Exception("Can't be draw.")
+            raise Exception("Game can't be a draw when one side has no pieces.")
         print
         print game
         # Fitness over last 100 episodes
@@ -142,14 +154,14 @@ class CheckersTask(object):
         if won:
             score += 30000
         print "\nGame finished in %d turns. Winner: %s. Score: %s" % (i,game.winner(), score)
-        return {'fitness':score, 'won': won, 'turns': i}
+        return {'fitness':score, 'won': won, 'turns': i, '_move_history': game.history[:]}
 
-    def play_against(self, network, user_side=WHITE):
+    def play_against(self, network, user_side=WHITE, history=None):
         # Setup
-        game = Checkers(minefield=self.minefield)
+        game = Checkers(minefield=self.minefield, fly_kings=self.fly_kings)
         # self.search_depth = 0
         player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)        
-        player.play_against(game, user_side=user_side)
+        player.play_against(game, user_side=user_side, history=history)
 
     def solve(self, network):
         o = self.opponent_handicap
@@ -185,7 +197,6 @@ class HeuristicOpponent(object):
         self.search_depth = search_depth
         self.heuristic = heuristic
         self.handicap = handicap
-        self.killer_moves = defaultdict(set)
     
     def pickmove(self, board, verbose=False):
         player_max = (board.to_move == BLACK)
@@ -200,9 +211,10 @@ class HeuristicOpponent(object):
             if verbose: print "0 evals."
             return moves[0]
         evals = [0]
+        killer_moves = defaultdict(set)
         for move in moves:
             val = alphabeta(board.copy_and_play(move), self.heuristic.evaluate, 
-                depth=self.search_depth-1, player_max=not player_max, killer_moves=self.killer_moves, num_evals=evals)
+                depth=self.search_depth-1, player_max=not player_max, killer_moves=killer_moves, num_evals=evals)
             if verbose: 
                 print board.copy_and_play(move)
                 print "Value: %.3f" % val
@@ -217,33 +229,46 @@ class HeuristicOpponent(object):
             return secondbest
         return bestmove
 
-    def play_against(self, game=None, user_side=WHITE):
+    def play_against(self, game=None, user_side=WHITE, history=None):
         if game is None:
             game = Checkers()
-        i = 0
-        print "Running checkers game..."
-        auto = HeuristicOpponent(SimpleHeuristic(), search_depth=4)
+        
+        print "Playing against %s" % self
 
+        auto = HeuristicOpponent(SimpleHeuristic(), search_depth=4)
+        full_auto = False
+        on_history = True if history else False
         fitness = []
+        i = 0
         while not game.game_over():
             # Computer plays first if user is white.
             if i > 0 or user_side == WHITE:
                 move = self.pickmove(game, verbose=False)
+                historical = history.pop(0) if history else None
                 print move
                 game.play(move)
+                if on_history and self.handicap == 0 and move != historical:
+                    raise Exception("Played different move from history.")
 
             if game.game_over():
                 break
+            
             fitness.append(gamefitness(game))
             print game
-            print "Enter move:",
             moved = False
             while not moved:
+                historical = history.pop(0) if history else None
+                best = auto.pickmove(game)
+                print "Enter move (h: %s, a: %s):" % (historical, best),
                 try:
                     user_input = raw_input()
-                    if 'a' in user_input or user_input == '':
-                        move = auto.pickmove(game)
-                    elif 'q' in user_input:
+                    if user_input == 'f':
+                        full_auto = True
+                    if user_input == 'h' or (on_history and user_input == ''):
+                        move = historical
+                    elif full_auto or user_input == 'a' or (not on_history and user_input == ''):
+                        move = best
+                    elif user_input == 'q':
                         move = None
                     elif ' ' in user_input:
                         move = tuple(int(i) for i in user_input.split(' '))
@@ -252,6 +277,8 @@ class HeuristicOpponent(object):
                     if move is not None:
                         game.play(move)
                     moved = True
+                    if move != historical:
+                        on_history = False
                 except (IllegalMoveError, ValueError):
                     print "Illegal move"
             fitness.append(gamefitness(game))
@@ -270,6 +297,10 @@ class HeuristicOpponent(object):
 
         won = game.winner() >= 1.0
         print "\nGame finished in %d turns. Winner: %s." % (i,game.winner())
+
+    def __str__(self):
+        return '%s with %s (lookahead: %d, handicap: %.2f)' % (self.__class__.__name__,
+            self.heuristic.__class__.__name__, self.search_depth, self.handicap)
         
 class SimpleHeuristic(object):
     """ Simple piece/position counting heuristic, adapted from simplech

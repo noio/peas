@@ -180,9 +180,10 @@ class SimplePopulation(object):
         """ Collects avg and max of individuals' stats (incl. fitness).
         """
         for key in pop[0].stats:
-            self.stats[key+'_avg'].append(np.mean([ind.stats[key] for ind in pop]))
-            self.stats[key+'_max'].append(np.max([ind.stats[key] for ind in pop]))
-            self.stats[key+'_min'].append(np.min([ind.stats[key] for ind in pop]))
+            if not key.startswith('_'):
+                self.stats[key+'_avg'].append(np.mean([ind.stats[key] for ind in pop]))
+                self.stats[key+'_max'].append(np.max([ind.stats[key] for ind in pop]))
+                self.stats[key+'_min'].append(np.min([ind.stats[key] for ind in pop]))
         self.stats['solved'].append( self.solved_at is not None )
         
     def _status_report(self):
