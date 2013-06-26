@@ -210,6 +210,13 @@ class NeuralNetwork(object):
             raise Exception("Connection Matrix does not describe feedforward network. \n %s" % np.sign(self.cm))
         self.feedforward = True
         self.cm[np.triu_indices(self.cm.shape[0])] = 0
+        # Compute effective depth:
+        conn = np.nan_to_num(self.cm) != 0
+        longest = np.zeros(conn.shape[:1], dtype=int)
+        for n in xrange(len(conn)):
+            if any(conn[n]):
+                longest[n] = max(longest[conn[n]]) + 1
+        self.effective_depth = max(longest)
         
     def flush(self):
         """ Reset activation values. """
@@ -223,7 +230,7 @@ class NeuralNetwork(object):
             :param add_bias: Add a bias input automatically, before other inputs.
         """
         if propagate != 1 and (self.feedforward or self.sandwich):
-            raise Exception("Feedforward and sandwich network have a fixed number of propagation steps.")
+            raise Exception("Feedforward and sandwich networks have a fixed number of propagation steps.")
         act = self.act
         node_types = self.node_types
         cm = self.cm
@@ -242,7 +249,7 @@ class NeuralNetwork(object):
         # times as there are nodes
         if self.feedforward:
             act = np.zeros(cm.shape[0])
-            propagate = len(node_types)
+            propagate = self.effective_depth
         # Sandwich networks only need to activate a single time
         if self.sandwich:
             propagate = 1

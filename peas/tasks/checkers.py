@@ -94,7 +94,7 @@ def gamefitness(game):
         the black player. (according to {gauci2008case}) """
     counts = np.bincount(game.board.flat)
     return (100 + 2 * counts[BLACK|MAN] + 3 * counts[BLACK|KING] + 
-            2 * (12 - counts[WHITE|MAN] + 3 * (12 - counts[WHITE|KING])))
+            2 * (12 - counts[WHITE|MAN]) + 3 * (12 - counts[WHITE|KING]))
 
 ### CLASSES ###
 
@@ -224,6 +224,7 @@ class HeuristicOpponent(object):
         print "Running checkers game..."
         auto = HeuristicOpponent(SimpleHeuristic(), search_depth=4)
 
+        fitness = []
         while not game.game_over():
             # Computer plays first if user is white.
             if i > 0 or user_side == WHITE:
@@ -233,14 +234,14 @@ class HeuristicOpponent(object):
 
             if game.game_over():
                 break
-
+            fitness.append(gamefitness(game))
             print game
             print "Enter move:",
             moved = False
             while not moved:
                 try:
                     user_input = raw_input()
-                    if 'a' in user_input:
+                    if 'a' in user_input or user_input == '':
                         move = auto.pickmove(game)
                     elif 'q' in user_input:
                         move = None
@@ -253,13 +254,20 @@ class HeuristicOpponent(object):
                     moved = True
                 except (IllegalMoveError, ValueError):
                     print "Illegal move"
+            fitness.append(gamefitness(game))
+            print fitness
             if move is None:
                 break
             print game
             time.sleep(1.0)
             i += 1
-            
+        
+        fitness.extend([gamefitness(game)] * (100 - len(fitness)))
+        fitness = fitness[-100:]
+        print fitness
+        
         print game
+
         won = game.winner() >= 1.0
         print "\nGame finished in %d turns. Winner: %s." % (i,game.winner())
         
@@ -468,8 +476,9 @@ class NetworkHeuristic(object):
                       (game.board == WHITE | MAN) * -0.5 +
                       (game.board == BLACK | KING) * 0.75 +
                       (game.board == WHITE | KING) * -0.75)
+        self.network.flush()
         # Feed twice to propagate through 3 layer network:
-        value = self.network.feed(net_inputs, add_bias=False, propagate=2)
+        value = self.network.feed(net_inputs, add_bias=False)
         return value[-1]
 
 class RandomOpponent(object):
@@ -661,7 +670,16 @@ class Checkers(object):
         
     def winner(self):
         """ Returns board score. """
-        if self.check_draw() or not self.game_over():
+        if self.check_draw():
+            if (self.board & MAN).sum() == 0:
+                w = (self.board & WHITE).sum()
+                b = (self.board & BLACK).sum()
+                if w >= 3 * b:
+                    return -1.0
+                elif b >= 3* w:
+                    return 1.0
+            return 0.0
+        if not self.game_over():
             return 0.0
         else:
             return 1.0 if self.to_move == WHITE else -1.0
