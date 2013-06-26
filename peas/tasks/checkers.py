@@ -165,9 +165,10 @@ class CheckersTask(object):
 
     def solve(self, network):
         o = self.opponent_handicap
-        self.opponent_handicap = 0.1
+        self.opponent_handicap = 0.05
         for _ in range(self.win_to_solve):
             if not self.evaluate(network)['won']:
+                self.opponent_handicap = o
                 return False
         self.opponent_handicap = o
         return True
