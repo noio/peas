@@ -188,7 +188,6 @@ class CheckersTask(object):
         print filename
         plt.close()
             
-
         
 class HeuristicOpponent(object):
     """ Opponent that utilizes a heuristic combined with alphabeta search
@@ -249,7 +248,7 @@ class HeuristicOpponent(object):
                 print move
                 game.play(move)
                 if on_history and self.handicap == 0 and move != historical:
-                    raise Exception("Played different move from history.")
+                    raise Exception("Played (%s) different move from history (%s)." % (move, historical))
 
             if game.game_over():
                 break
@@ -522,7 +521,7 @@ class Checkers(object):
     """ Represents the checkers game(state)
     """
 
-    def __init__(self, no_advance_draw=50, fly_kings=False, minefield=False):
+    def __init__(self, no_advance_draw=50, fly_kings=False, minefield=False, max_repeat_moves=3):
         """ Initialize the game board. """
         self.no_advance_draw = no_advance_draw
 
@@ -533,6 +532,7 @@ class Checkers(object):
         self.advancement = []
         self.minefield = minefield
         self.fly_kings = fly_kings
+        self.max_repeat_moves = max_repeat_moves
 
         tiles = self.board > 0
         self.board[tiles] = EMPTY
@@ -546,6 +546,15 @@ class Checkers(object):
     def all_moves(self):
         if self._moves is None:
             self._moves = list(self.generate_moves())
+        if len(self.history) > self.max_repeat_moves * 4:
+            for i in range(self.max_repeat_moves):
+                if (self.history[-2 - 4 * i] != self.history[-2 - 4 * (i+1)]):
+                    break
+            if i == self.max_repeat_moves - 1:
+                print "CYCLE!" + str(self.history)
+                if self.history[-2] in self._moves:
+                    self._moves.remove(self.history[-2])
+                    print "REMOVED" + str(self.history[-2])
         return self._moves
                        
     def generate_moves(self):
