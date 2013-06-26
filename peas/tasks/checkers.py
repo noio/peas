@@ -150,10 +150,11 @@ class CheckersTask(object):
         fitness = fitness[-100:]
         score = sum(fitness)
         won = game.winner() >= 1.0
+        draw = game.winner() == 0.0
         if won:
             score += 30000
         print "\nGame finished in %d turns. Winner: %s. Score: %d. Final state fitness: %d." % (i,game.winner(), score, fitness[-1])
-        return {'fitness':score, 'won': won, 'turns': i, '_move_history': game.history[:]}
+        return {'fitness':score, 'won': won, 'draw': draw, 'turns': i, '_move_history': game.history[:]}
 
     def play_against(self, network, user_side=WHITE, history=None):
         # Setup
