@@ -256,14 +256,17 @@ class NeuralNetwork(object):
         if self.sandwich:
             propagate = 1
         for _ in xrange(propagate):
+            # Feed the input, overwriting existing input node activation
             act[:input_size] = input_activation.flat[:input_size]
             
+            # Propagate activation
             if self.sum_all_node_inputs:
                 nodeinputs = np.dot(self.cm, act)
             else:
                 nodeinputs = self.cm * act
                 nodeinputs = [ni[-np.isnan(ni)] for ni in nodeinputs]
             
+            # Apply the node type functions
             if self.all_nodes_same_function:
                 act = node_types[0](nodeinputs)
             else:

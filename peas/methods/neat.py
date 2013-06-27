@@ -394,7 +394,7 @@ class NEATGenotype(object):
             len(self.node_genes), len(self.conn_genes))
             
     def visualize(self, filename):
-        return NeuralNetwork(self).visualize(filename, inputs=self.inputs, outputs=self.outputs)
+        return NeuralNetwork(self).visualize(filename, inputs=self.inputs + 1 * (not self.bias_as_node), outputs=self.outputs)
         
 class NEATSpecies(object):
     

@@ -60,7 +60,7 @@ class WaveletGenotype(object):
         self.prob_mutate_bias = prob_mutate_bias
         self.prob_modify  = prob_modify
         self.stdev_mutate = stdev_mutate
-        self.wavelets     = [[]] * layers # Each defined by an affine matrix.
+        self.wavelets     = [list() for _ in xrange(layers)] # Each defined by an affine matrix.
         self.bias = 0.0
         
         for _ in xrange(initial):
@@ -103,6 +103,20 @@ class WaveletGenotype(object):
                         wavelet[2] += np.random.normal(0, self.stdev_mutate, wavelet[2].shape)
                 
         return self # for chaining
+
+    def visualize(self, filename):
+        from matplotlib.mlab import PCA
+        # Extract coords (translation part of matrix) of wavelets
+        for layer in self.wavelets:
+            print "LAYER"
+            print id(layer)
+            for w in layer:
+                print w[0]
+                print w[1]
+                print w[2]
+            t = np.array([w[2][:,-1] for w in layer])
+            print t
+
                         
     def __str__(self):
         return "%s with %d wavelets" % (self.__class__.__name__, len(self.wavelets))
