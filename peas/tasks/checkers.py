@@ -35,11 +35,33 @@ NUMBERING = np.array([[ 4,  0,  3,  0,  2,  0,  1,  0],
                       [28,  0, 27,  0, 26,  0, 25,  0],
                       [ 0, 32,  0, 31,  0, 30,  0, 29]])
 
-CENTER = [(2,2), (2,4), (3,3), (3,5), (4,2), (4,4), (5,3), (5,5)]
-EDGE = [(0,0), (0,2), (0,4), (0,6), (1,7), (2,0), (3,7), (4,0), (5,7), (6,0), (7,1), (7,3), (7,5), (7,7)]
-SAFEEDGE = [(0,6), (1,7), (6,0), (7,1)]
-                 
-INVNUM = dict([(n, tuple(a[0] for a in np.nonzero(NUMBERING == n))) for n in range(1, NUMBERING.max() + 1)])
+# The internal board representation is like this, because it makes simulating
+# moves easy, every move is either +4, +5, -4 or -5. And moving "off the board",
+# still results in a valid array index, albeit one marked as "EMPTY" (in stead
+# of "FREE"). This is why the internal board is size 46, to allow 40+5.
+
+INTERNAL = np.array([[ 5,  0,  6,  0,  7,  0,  8,  0],
+                     [ 0,  10, 0, 11,  0, 12,  0, 13],
+                     [14,  0, 15,  0, 16,  0, 17,  0],
+                     [ 0, 19,  0, 20,  0, 21,  0, 22],
+                     [23,  0, 24,  0, 25,  0, 26,  0],
+                     [ 0, 28,  0, 29,  0, 30,  0, 31],
+                     [32,  0, 33,  0, 34,  0, 35,  0],
+                     [ 0, 37,  0, 38,  0, 39,  0, 40]])
+
+ALL_SQUARES = list(np.unique(INTERNAL[INTERNAL>0]))
+
+# CENTER = [(2,2), (2,4), (3,3), (3,5), (4,2), (4,4), (5,3), (5,5)]
+CENTER = [15, 16, 20, 21, 24, 25, 29, 30]
+# EDGE = [(0,0), (0,2), (0,4), (0,6), (1,7), (2,0), (3,7), (4,0), (5,7), (6,0), (7,1), (7,3), (7,5), (7,7)]
+EDGE = [5, 6, 7, 8, 13, 14, 22, 23, 31, 32, 37, 38, 39, 40]
+# SAFEEDGE = [(0,6), (1,7), (6,0), (7,1)]
+SAFEEDGE = [7, 13, 32, 37]
+ROW = [0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,0,3,3,3,3,4,4,4,4,0,5,5,5,5,6,6,6,6,0,7,7,7,7]
+
+# INVNUM = dict([(n, tuple(a[0] for a in np.nonzero(NUMBERING == n))) for n in range(1, NUMBERING.max() + 1)])
+INV_INTERNAL = [(tuple(a[0] for a in np.nonzero(INTERNAL == n)) if n in INTERNAL else None) for n in range(INTERNAL.max() + 1)]
+INTERNAL_TO_NUMBERING = [NUMBERING[a] for a in INV_INTERNAL]
 
 ### EXCEPTIONS
 
@@ -47,6 +69,26 @@ class IllegalMoveError(Exception):
     pass
 
 ### FUNCTIONS ###
+
+def board2d(internal):
+    """ Convert internal (46) board representation to 8x8 
+    """
+    board = INTERNAL.copy()
+    for i in ALL_SQUARES:
+        board[INV_INTERNAL[i]] = internal[i]
+    return board
+
+def movestr(move):
+    """ Print a move as human readable (using NUMBERING)
+    """
+    if move is None: return None
+    # Check if it's a capture:
+    n = [str(INTERNAL_TO_NUMBERING[m]) for m in move]
+    if abs(move[1]-move[0]) > 5 or len(move) > 2:
+        return 'x'.join(n)
+    else:
+        return '-'.join(n)
+
 def alphabeta(node, heuristic, player_max=True, depth=4, alpha=-inf, beta=inf, killer_moves=defaultdict(set), num_evals=[0]):
     """ Performs alphabeta search.
         From wikipedia pseudocode.
@@ -105,6 +147,37 @@ def gamefitness(game):
     return (100 + 2 * counts[BLACK|MAN] + 3 * counts[BLACK|KING] + 
             2 * (12 - counts[WHITE|MAN]) + 3 * (12 - counts[WHITE|KING]))
 
+def playgame(black, white, game=None, history=None):
+    """ Play a game between two opponents, return stats """
+    # Input arguments
+    if game is None:
+        game = Checkers()
+    # Initialize
+    fitness = []
+    i = 0
+    current, next = black, white
+
+    print "Checkers: %s vs. %s " % (black, white)
+    while not game.game_over():
+        i += 1
+        historical = history.pop(0) if history else None
+        move = current.pickmove(game, historical=historical)
+        if move != historical:
+            history = None
+        game.play(move)
+        fitness.append(gamefitness(game))
+        sys.stdout.write('.')
+        sys.stdout.flush()
+        current, next = next, current
+
+    print
+    print game
+    # Fitness over last 100 episodes
+    fitness.extend([gamefitness(game)] * (100 - len(fitness)))
+    fitness = fitness[-100:]
+    winner = game.winner()
+    return winner, fitness
+
 ### CLASSES ###
 
 class CheckersTask(object):
@@ -115,20 +188,16 @@ class CheckersTask(object):
                        opponent='simplech', 
                        opponent_search_depth=4, 
                        opponent_handicap=0.0, 
-                       minefield=False, 
-                       fly_kings=False, 
                        win_to_solve=3):
         self.search_depth = search_depth
         self.opponent_search_depth = opponent_search_depth
         self.opponent_handicap = opponent_handicap
         self.opponent = opponent
         self.win_to_solve = win_to_solve
-        self.minefield = minefield
-        self.fly_kings = fly_kings
 
     def evaluate(self, network):
         # Setup
-        game = Checkers(minefield=self.minefield, fly_kings=self.fly_kings)
+        game = Checkers()
         player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)
         if self.opponent == 'simplech':
             opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=self.opponent_search_depth, handicap=self.opponent_handicap)
@@ -137,40 +206,22 @@ class CheckersTask(object):
         elif self.opponent == 'random':
             opponent = RandomOpponent()
         # Play the game
-        fitness = []
-        current, next = player, opponent
-        i = 0
-        print "Running checkers game between %s - %s " % (player, opponent)
-        while not game.game_over():
-            i += 1
-            move = current.pickmove(game)
-            game.play(move)
-            current, next = next, current
-            fitness.append(gamefitness(game))
-            sys.stdout.write('.')
-            sys.stdout.flush()
-
-        if ((game.board & WHITE).sum() == 0 or (game.board & BLACK).sum() == 0) and game.winner() == 0:
-            raise Exception("Game can't be a draw when one side has no pieces.")
-        print
-        print game
-        # Fitness over last 100 episodes
-        fitness.extend([gamefitness(game)] * (100 - len(fitness)))
-        fitness = fitness[-100:]
+        winner, fitness = playgame(player, opponent, game)
+        won = winner >= 1.0
+        draw = winner == 0.0
         score = sum(fitness)
-        won = game.winner() >= 1.0
-        draw = game.winner() == 0.0
         if won:
             score += 30000
-        print "\nGame finished in %d turns. Winner: %s. Score: %d. Final state fitness: %d." % (i,game.winner(), score, fitness[-1])
-        return {'fitness':score, 'won': won, 'draw': draw, 'turns': i, '_move_history': game.history[:]}
+        turns = len(game.history)
+        print "\nGame finished in %d turns. Winner: %s. Score: %d. Final state fitness: %d." % (turns,game.winner(), score, fitness[-1])
+        return {'fitness':score, 'won': won, 'draw': draw, 'turns': turns, '_move_history': game.history[:]}
 
     def play_against(self, network, user_side=WHITE, history=None):
         # Setup
-        game = Checkers(minefield=self.minefield, fly_kings=self.fly_kings)
-        # self.search_depth = 0
-        player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)        
-        player.play_against(game, user_side=user_side, history=history)
+        game = Checkers()
+        player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)
+        user = UserOpponent(auto = HeuristicOpponent(SimpleHeuristic(), search_depth=self.opponent_search_depth))
+        playgame(player, user, game=game, history=history)
 
     def solve(self, network):
         o = self.opponent_handicap
@@ -197,6 +248,47 @@ class CheckersTask(object):
         print filename
         plt.close()
             
+class UserOpponent(object):
+    
+    def __init__(self, auto=None):
+        self.auto = auto
+        if self.auto is None:
+            self.auto = HeuristicOpponent(SimpleHeuristic(), search_depth=4)
+        self.skip = False
+
+    def pickmove(self, board, historical=None, verbose=None):
+        best = self.auto.pickmove(board, verbose=True)
+        moved = False
+        while not moved:
+            # Prompt user for move
+            print board
+            if board.history:
+                print "Opponent moved %s" % movestr(board.history[-1])
+            print "Enter move ([h]istory: %s, [a]uto: %s):" % (movestr(historical), movestr(best)),
+            try:
+                if not self.skip:
+                    user_input = raw_input()
+                else:
+                    user_input = 'a'
+                if user_input == 's':
+                    self.skip = True
+                if user_input == 'h' or (historical is not None and user_input == ''):
+                    move = historical
+                elif self.skip or user_input == 'a' or (not historical and user_input == ''):
+                    move = best
+                elif user_input == 'q':
+                    return None
+                elif ' ' in user_input:
+                    move = tuple(int(i) for i in user_input.split(' '))
+                else:
+                    move = tuple(int(i) for i in user_input.split('-'))
+                if move is not None:
+                    board.copy_and_play(move)
+                moved = True
+            except (IllegalMoveError, ValueError):
+                print "Illegal move."
+        return move
+
         
 class HeuristicOpponent(object):
     """ Opponent that utilizes a heuristic combined with alphabeta search
@@ -208,7 +300,7 @@ class HeuristicOpponent(object):
         self.handicap = handicap
         self.killer_moves = defaultdict(set)
     
-    def pickmove(self, board, verbose=False):
+    def pickmove(self, board, verbose=False, historical=None):
         player_max = (board.to_move == BLACK)
         if verbose:
             print "Picking move for player %s" % ("MAX" if player_max else "MIN")
@@ -232,85 +324,11 @@ class HeuristicOpponent(object):
         if verbose: 
             # self.heuristic.evaluate(board.copy_and_play(bestmove), verbose=True)
             print "%d evals. value: %.2f" % (evals[0], bestval)
+        if historical and self.handicap == 0 and bestmove != historical:
+            raise Exception("Playing different move from history. Shouldn't happen because I'm deterministic!")
         if secondbest is not None and self.handicap > 0 and random.random() < self.handicap:
             return secondbest
         return bestmove
-
-    def play_against(self, game=None, user_side=WHITE, history=None):
-        if game is None:
-            game = Checkers()
-        
-        print "Playing against %s" % self
-
-        auto = HeuristicOpponent(SimpleHeuristic(), search_depth=4)
-        full_auto = False
-        on_history = True if history else False
-        fitness = []
-        i = 0
-        while not game.game_over():
-            # Computer plays first if user is white.
-            if i > 0 or user_side == WHITE:
-                move = self.pickmove(game, verbose=False)
-                historical = history.pop(0) if history else None
-                game.play(move)
-                if on_history and self.handicap == 0 and move != historical:
-                    # raise Exception("Played (%s) different move from history (%s)." % (move, historical))
-                    pass
-
-            if game.game_over():
-                break
-            
-            fitness.append(gamefitness(game))
-            print game
-            moved = False
-            while not moved:
-                historical = history.pop(0) if history else None
-                best = auto.pickmove(game, verbose=True)
-                
-                # Prompt user for move
-                if game.history:
-                    print "Opponent moved %s" % (game.history[-1],)
-                print "Enter move ([h]istory: %s, [a]uto: %s):" % (historical, best),
-
-                try:
-                    if not full_auto:
-                        user_input = raw_input()
-                    else:
-                        user_input = 'a'
-                    if user_input == 'f':
-                        full_auto = True
-                    if user_input == 'h' or (on_history and user_input == ''):
-                        move = historical
-                    elif full_auto or user_input == 'a' or (not on_history and user_input == ''):
-                        move = best
-                    elif user_input == 'q':
-                        move = None
-                    elif ' ' in user_input:
-                        move = tuple(int(i) for i in user_input.split(' '))
-                    else:
-                        move = tuple(int(i) for i in user_input.split('-'))
-                    if move is not None:
-                        game.play(move)
-                    moved = True
-                    if move != historical:
-                        on_history = False
-                        history = None
-                except (IllegalMoveError, ValueError):
-                    print "Illegal move"
-            fitness.append(gamefitness(game))
-            if move is None:
-                break
-            print game
-            i += 1
-        
-        fitness.extend([gamefitness(game)] * (100 - len(fitness)))
-        fitness = fitness[-100:]
-        print fitness
-        
-        print game
-
-        won = game.winner() >= 1.0
-        print "\nGame finished in %d turns. Winner: %s." % (i,game.winner())
 
     def __str__(self):
         return '%s with %s (lookahead: %d, handicap: %.2f)' % (self.__class__.__name__,
@@ -327,7 +345,7 @@ class SimpleHeuristic(object):
         if game.game_over():
             return 5000 * game.winner()
         board = game.board
-        counts = np.bincount(board.flat)
+        counts = np.bincount(board)
 
         turn = 2;     # color to move gets +turn
         brv = 3;      # multiplier for back rank
@@ -363,17 +381,17 @@ class SimpleHeuristic(object):
 
         val += turn if game.to_move == BLACK else -turn
 
-        if board[4][0] == (BLACK|MAN) and board[5][1] == (WHITE|MAN):
+        if board[23] == (BLACK|MAN) and board[28] == (WHITE|MAN):
             val += cramp
-        if board[3][7] == (WHITE|MAN) and board[2][6] == (BLACK|MAN):
+        if board[22] == (WHITE|MAN) and board[17] == (BLACK|MAN):
             val -= cramp
 
         # Back rank guard
         code = 0
-        if (board[0][0] & MAN): code += 1
-        if (board[0][2] & MAN): code += 2
-        if (board[0][4] & MAN): code += 4
-        if (board[0][6] & MAN): code += 8
+        if (board[5] & MAN): code += 1
+        if (board[6] & MAN): code += 2
+        if (board[7] & MAN): code += 4
+        if (board[8] & MAN): code += 8
         if code == 1:
             backrankb = -1
         elif code in (0, 3, 9):
@@ -392,10 +410,10 @@ class SimpleHeuristic(object):
             backrankb = 9
         
         code = 0
-        if (board[7][1] & MAN): code += 8
-        if (board[7][3] & MAN): code += 4
-        if (board[7][5] & MAN): code += 2
-        if (board[7][7] & MAN): code += 1
+        if (board[37] & MAN): code += 8
+        if (board[38] & MAN): code += 4
+        if (board[39] & MAN): code += 2
+        if (board[40] & MAN): code += 1
 
         if code == 1:
             backrankw = -1
@@ -419,9 +437,9 @@ class SimpleHeuristic(object):
         if verbose: print 'backrank', val
 
         # Double Corner
-        if board[0][6] == BLACK|MAN and (board[1][5] == BLACK|MAN or board[1][7] == BLACK|MAN):
+        if board[8] == BLACK|MAN and (board[12] == BLACK|MAN or board[13] == BLACK|MAN):
             val += intactdoublecorner
-        if board[7][1] == WHITE|MAN and (board[6][0] == WHITE|MAN or board[6][2] == WHITE|MAN):
+        if board[37] == WHITE|MAN and (board[32] == WHITE|MAN or board[33] == WHITE|MAN):
             val -= intactdoublecorner
 
         if verbose: print 'double corner', val
@@ -454,12 +472,11 @@ class SimpleHeuristic(object):
 
         # Tempo
         tempo = 0
-        for i in xrange(8):
-            for j in xrange(8):
-                if board[i,j] == BLACK|MAN:
-                    tempo += i
-                elif board[i,j] == WHITE|MAN:
-                    tempo -= 7-i
+        for i in range(5, 41):
+            if board[i] == BLACK|MAN:
+                tempo += ROW[i]
+            elif board[i] == WHITE|MAN:
+                tempo -= 7-ROW[i]
         if nm >= 16:
             val += opening * tempo
         if 12 <= nm <= 15:
@@ -478,14 +495,22 @@ class SimpleHeuristic(object):
 
         if verbose: print 'tempo', val
 
+        # [[ 5  0  6  0  7  0  8  0]
+        #  [ 0 10  0 11  0 12  0 13]
+        #  [14  0 15  0 16  0 17  0]
+        #  [ 0 19  0 20  0 21  0 22]
+        #  [23  0 24  0 25  0 26  0]
+        #  [ 0 28  0 29  0 30  0 31]
+        #  [32  0 33  0 34  0 35  0]
+        #  [ 0 37  0 38  0 39  0 40]]
 
-        # I have no idea what this last bit does.. :(
+        # I have no idea what this last bit does XD.. it's correct tho.
         stonesinsystem = 0
         if nwm + nwk - nbk - nbm == 0:
             if game.to_move == BLACK:
-                for row in xrange(0, 8, 2):
-                    for c in xrange(0, 8, 2):
-                        if board[row,c] != FREE:
+                for i in xrange(5, 9):
+                    for j in xrange(4):
+                        if board[i + 9 * j] != FREE:
                             stonesinsystem += 1
                 if stonesinsystem % 2 == 0:
                     if nm + nk <= 12: val += 1
@@ -498,9 +523,9 @@ class SimpleHeuristic(object):
                     if nm + nk <= 8: val -= 2
                     if nm + nk <= 6: val -= 2
             else:
-                for row in xrange(1, 8, 2):
-                    for c in xrange(1, 8, 2):
-                        if board[row,c] != FREE:
+                for i in xrange(10, 14):
+                    for j in xrange(4):
+                        if board[i + 9 * j] != FREE:
                             stonesinsystem += 1
                 if stonesinsystem % 2 == 0:
                     if nm + nk <= 12: val += 1
@@ -521,7 +546,7 @@ class PieceCounter(object):
         if game.game_over():
             return 5000 * game.winner()
 
-        counts = np.bincount(game.board.flat)
+        counts = np.bincount(game.board)
 
         nwm = counts[WHITE|MAN]
         nwk = counts[WHITE|KING]
@@ -542,11 +567,11 @@ class NetworkHeuristic(object):
     def evaluate(self, game, verbose=False):
         if game.game_over():
             return 5000 * game.winner()
-
-        net_inputs = ((game.board == BLACK | MAN) * 0.5 +
-                      (game.board == WHITE | MAN) * -0.5 +
-                      (game.board == BLACK | KING) * 0.75 +
-                      (game.board == WHITE | KING) * -0.75)
+        board = board2d(game.board)
+        net_inputs = ((board == BLACK | MAN) * 0.5 +
+                      (board == WHITE | MAN) * -0.5 +
+                      (board == BLACK | KING) * 0.75 +
+                      (board == WHITE | KING) * -0.75)
         self.network.flush()
         # Feed twice to propagate through 3 layer network:
         value = self.network.feed(net_inputs, add_bias=False)
@@ -554,32 +579,30 @@ class NetworkHeuristic(object):
 
 class RandomOpponent(object):
     """ An opponent that plays random moves """
-    def pickmove(self, game):
+    def pickmove(self, game, historical=None):
         return random.choice(list(game.all_moves()))
 
 class Checkers(object):
     """ Represents the checkers game(state)
     """
 
-    def __init__(self, no_advance_draw=50, fly_kings=False, minefield=False, max_repeat_moves=1000):
+    def __init__(self, no_advance_draw=50, max_repeat_moves=1000):
         """ Initialize the game board. """
         self.no_advance_draw = no_advance_draw
 
-        self.board = NUMBERING.copy() #: The board state
         self.to_move = BLACK          #: Whose move it is
         self.turn = 0
         self.history = []
+        self.history_captures = []
         self.advancement = []
-        self.minefield = minefield
-        self.fly_kings = fly_kings
         self.max_repeat_moves = max_repeat_moves
 
-        tiles = self.board > 0
-        self.board[tiles] = EMPTY
-        self.board[:3,:] = BLACK | MAN
+        self.board = np.zeros(46, dtype=int)
+        self.board[5:41] = FREE
+        self.board[INTERNAL[:3,:]] = BLACK | MAN
         # self.board[3, :] = WHITE | MAN
-        self.board[5:,:] = WHITE | MAN
-        self.board[np.logical_not(tiles)] = FREE
+        self.board[INTERNAL[5:,:]] = WHITE | MAN
+        self.board[[0,9,18,27,36]] = EMPTY
         
         self._moves = None
 
@@ -603,85 +626,57 @@ class Checkers(object):
         self.captures_possible = False
         pieces = []
         # Check for possible captures first:
-        for n, (y,x) in INVNUM.iteritems():
-            piece = self.board[y, x]
+        for s in ALL_SQUARES:
+            piece = self.board[s]
             if piece & self.to_move:
-                pieces.append((n, (y, x), piece))
-                for m in self.captures((y, x), piece, self.board):
+                pieces.append((s, piece))
+                for m in self.captures(s, piece, self.board):
                     if len(m) > 1:
                         self.captures_possible = True
                         yield m
         # Otherwise check for normal moves:
         if not self.captures_possible:
-            for (n, (y, x), piece) in pieces:
+            for (s, piece) in pieces:
                 # MAN moves
                 if piece & MAN:
-                    nextrow = y + 1 if (self.to_move == BLACK) else y - 1
-                    if 0 <= nextrow < 8:
-                        if x - 1 >= 0 and self.board[nextrow, x - 1] == EMPTY:
-                            yield (n, NUMBERING[nextrow, x - 1])
-                        if x + 1 < 8 and self.board[nextrow, x + 1] == EMPTY:
-                            yield (n, NUMBERING[nextrow, x + 1])
+                    n1, n2 = (s + 4, s + 5) if self.to_move == BLACK else (s - 4, s - 5)
+                    if self.board[n1] == FREE: yield (s, n1)
+                    if self.board[n2] == FREE: yield (s, n2)
                 # KING moves
                 else:
-                    for dx in [-1, 1]:
-                        for dy in [-1, 1]:                
-                            dist = 1
-                            while True:
-                                tx, ty = x + dist * dx, y + dist * dy # Target square
-                                if not ((0 <= tx < 8 and 0 <= ty < 8) and self.board[ty, tx] == EMPTY):
-                                    break
-                                else:
-                                    yield (n, NUMBERING[ty, tx])
-                                if not self.fly_kings:
-                                    break
-                                dist += 1
-
+                    for m in (s + 4, s + 5, s - 4, s - 5):
+                        if self.board[m] == FREE:
+                            yield (s, m)
     
-    def captures(self, (py, px), piece, board, captured=[], start=None):
+    def captures(self, s, piece, board, captured=[], start=None):
         """ Return a list of possible capture moves for given piece in a 
             checkers game. 
 
-            :param (py, px): location of piece on the board
+            :param s: location of piece on the board
             :param piece: piece type (BLACK/WHITE|MAN/KING)
             :param board: the 2D board matrix
             :param captured: list of already-captured pieces (can't jump twice)
             :param start: from where this capture chain started.
             """
         if start is None:
-            start = (py, px)
+            start = s
         opponent = BLACK if piece & WHITE else WHITE
-        forward = [-1, 1] if piece & KING else [1] if piece & BLACK else [-1]
+        dirs = [-5, -4, 4, 5] if piece & KING else [4, 5] if piece & BLACK else [-5, -4]
         # Look for capture moves
-        for dx in [-1, 1]:
-            for dy in forward:
-                jx, jy = px, py
-                while True:
-                    jx += dx # Jumped square
-                    jy += dy 
-                    # Check if piece at jx, jy:
-                    if not (0 <= jx < 8 and 0 <= jy < 8):
-                        break
-                    if board[jy, jx] != EMPTY:
-                        tx = jx + dx # Target square
-                        ty = jy + dy 
-                        # Check if it can be captured:
-                        if ((0 <= tx < 8 and 0 <= ty < 8) and
-                            ((ty, tx) == start or board[ty, tx] == EMPTY) and
-                            (jy, jx) not in captured and
-                            (board[jy, jx] & opponent)
-                            ):
-                            # Normal pieces cannot continue capturing after reaching last row
-                            if not piece & KING and (piece & WHITE and ty == 0 or piece & BLACK and ty == 7):
-                                yield (NUMBERING[py, px], NUMBERING[ty, tx])
-                            else:
-                                for sequence in self.captures((ty, tx), piece, board, captured + [(jy, jx)], start):
-                                    yield (NUMBERING[py, px],) + sequence
-                        break
+        for d in dirs:
+            j = s + d
+            # Check if piece at [j]umped square:
+            if board[j] & opponent:
+                t = j + d # [t]arget square (where we land after jump)
+                # Check if it can be captured:
+                if (board[t] == FREE and j not in captured):
+                    # Normal pieces cannot continue capturing after reaching last row (5,6,7,8 or 37,38,39,40)
+                    if not piece & KING and (piece & WHITE and t <= 8 or piece & BLACK and t >= 37):
+                        yield (s, t)
                     else:
-                        if piece & MAN or not self.fly_kings:
-                            break
-        yield (NUMBERING[py, px],)
+                        for sequence in self.captures(t, piece, board, captured + [j], start):
+                            yield (s,) + sequence
+        yield (s,)
                         
         
     def play(self, move):
@@ -689,38 +684,27 @@ class Checkers(object):
         if move not in self.all_moves():
             raise IllegalMoveError("Illegal move")
         self.history.append(move)
-        positions = [INVNUM[p] for p in move]
         # Check for captures
-        capture = False
-        stone_dies = False
-        (ly, lx) = positions[0]
-        for (py, px) in positions[1:]:
-            ydir = 1 if py > ly else -1
-            xdir = 1 if px > lx else -1
-            for y, x in zip(xrange(ly + ydir, py, ydir),xrange(lx + xdir, px, xdir)):
-                if self.board[y,x] != EMPTY:
-                    self.board[y,x] = EMPTY
-                    if self.minefield and 2 <= x < 6 and 2 <= y < 6:
-                        stone_dies = True
-                    capture = True
-            (ly, lx) = (py, px)
+        captured = []
+        l = move[0]
+        for p in move[1:]:
+            # If move is a capture
+            if abs(p - l) > 5:
+                c = (p + l) / 2
+                captured.append(self.board[c])
+                self.board[c] = FREE
+            l = p
+        self.history_captures.append(captured)
         # Move the piece
-        (ly, lx) = positions[0]
-        (py, px) = positions[-1]
-        piece = self.board[ly, lx]
-        self.board[ly, lx] = EMPTY
+        piece = self.board[move[0]]
+        self.board[move[0]] = FREE
         # The game advances if a pieces is captured, or if a man moves
         # towards the kings row.
-        self.advancement.append(capture or (piece & MAN))
+        self.advancement.append(captured or (piece & MAN))
         # Check if the piece needs to be crowned
-        if (piece & MAN) and ((piece & BLACK and py == 7) or (piece & WHITE and py == 0)):
+        if (piece & MAN) and ((piece & BLACK and p >= 37) or (piece & WHITE and p <= 8)):
             piece = piece ^ MAN | KING
-        self.board[py, px] = piece
-
-        # Kill the piece if a capture was performed on the minefield.
-        if stone_dies:
-            self.board[py, px] = EMPTY
-
+        self.board[p] = piece
         self.to_move = WHITE if self.to_move == BLACK else BLACK
         self.turn += 1
         # Cached moveset is invalidated.
@@ -728,6 +712,7 @@ class Checkers(object):
         return self
 
     def undoplay(self, move):
+        raise NotImplementedError("Not done.")
         if move != self.history[-1]:
             raise Exception("Trying to undo move that wasn't last.")
         if self.fly_kings:
@@ -741,6 +726,8 @@ class Checkers(object):
             if abs(py - ly) > 1:
                 pass
 
+        self.history.pop()
+        self.history_captures.pop()
         self.to_move = WHITE if self.to_move == BLACK else BLACK
         self.turn -= 1
         self._moves = None
@@ -771,14 +758,14 @@ class Checkers(object):
         
     def winner(self):
         """ Returns board score. """
+        arr = np.array(self.board)
         if self.check_draw():
-            if (self.board & MAN).sum() == 0:
-                w = (self.board & WHITE).sum()
-                b = (self.board & BLACK).sum()
-                if w >= 3 * b:
-                    return -1.0
-                elif b >= 3* w:
-                    return 1.0
+            wk = (arr & (WHITE|KING)).sum()
+            bk = (arr & (BLACK|KING)).sum()
+            if wk >= 3 * bk:
+                return -1.0
+            elif bk >= 3* wk:
+                return 1.0
             return 0.0
         if not self.game_over():
             return 0.0
@@ -790,16 +777,18 @@ class Checkers(object):
         new.board = self.board.copy()       # Copy the board explicitly
         new._moves = copy.copy(self._moves) # Shallow copy is enough.
         new.history = self.history[:]
+        new.history_captures = self.history_captures[:]
         new.advancement = self.advancement[:]
         return new
 
     def __str__(self):
-        s = np.array([l for l in "-    wb  WB      "])
-        s = s[self.board]
+        board = board2d(self.board)
+        s = np.array([l for l in "     wb  WB     -"])
+        s = s[board]
         if self.to_move == BLACK:
-            s[0,7] = 'v'
+            s[0,7] = '^'
         else:
-            s[7,0] = '^'
+            s[7,0] = 'v'
         n = [''.join(('%2d' % n) if (n > 0) else '  ' for n in row) for row in NUMBERING]
         s = [' '.join(l) for l in s]
         o = ['   %s   ||   %s' % line for line in zip(s, n)]
@@ -809,6 +798,9 @@ class Checkers(object):
 ### PROCEDURE ###
 
 if __name__ == '__main__':
+    c = Checkers()
+    user = UserOpponent()
     opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=4)
-    opponent.play_against(user_side=BLACK)
+    playgame(opponent, user)
+    # opponent.play_against(user_side=BLACK)
     
