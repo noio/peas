@@ -25,6 +25,10 @@ BLACK = 2
 MAN   = 4
 KING  = 8
 FREE  = 16 
+BLACK_MAN = BLACK|MAN
+WHITE_MAN = WHITE|MAN
+BLACK_KING = BLACK|KING
+WHITE_KING = WHITE|KING
 
 NUMBERING = np.array([[ 4,  0,  3,  0,  2,  0,  1,  0],
                       [ 0,  8,  0,  7,  0,  6,  0,  5],
@@ -59,9 +63,11 @@ EDGE = [5, 6, 7, 8, 13, 14, 22, 23, 31, 32, 37, 38, 39, 40]
 SAFEEDGE = [7, 13, 32, 37]
 ROW = [0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,0,3,3,3,3,4,4,4,4,0,5,5,5,5,6,6,6,6,0,7,7,7,7]
 
-# INVNUM = dict([(n, tuple(a[0] for a in np.nonzero(NUMBERING == n))) for n in range(1, NUMBERING.max() + 1)])
+INV_NUMBERING =[tuple(a[0] for a in np.nonzero(NUMBERING == n)) for n in range(1, NUMBERING.max() + 1)]
 INV_INTERNAL = [(tuple(a[0] for a in np.nonzero(INTERNAL == n)) if n in INTERNAL else None) for n in range(INTERNAL.max() + 1)]
 INTERNAL_TO_NUMBERING = [NUMBERING[a] for a in INV_INTERNAL]
+NUMBERING_TO_INTERNAL = [INTERNAL[a] for a in INV_NUMBERING]
+
 
 ### EXCEPTIONS
 
@@ -73,7 +79,7 @@ class IllegalMoveError(Exception):
 def board2d(internal):
     """ Convert internal (46) board representation to 8x8 
     """
-    board = INTERNAL.copy()
+    board = np.zeros((8,8), dtype=int)
     for i in ALL_SQUARES:
         board[INV_INTERNAL[i]] = internal[i]
     return board
@@ -147,7 +153,7 @@ def gamefitness(game):
     return (100 + 2 * counts[BLACK|MAN] + 3 * counts[BLACK|KING] + 
             2 * (12 - counts[WHITE|MAN]) + 3 * (12 - counts[WHITE|KING]))
 
-def playgame(black, white, game=None, history=None):
+def playgame(black, white, game=None, history=None, verbose=False):
     """ Play a game between two opponents, return stats """
     # Input arguments
     if game is None:
@@ -161,7 +167,7 @@ def playgame(black, white, game=None, history=None):
     while not game.game_over():
         i += 1
         historical = history.pop(0) if history else None
-        move = current.pickmove(game, historical=historical)
+        move = current.pickmove(game, historical=historical, verbose=verbose)
         if move != historical:
             history = None
         game.play(move)
@@ -221,7 +227,7 @@ class CheckersTask(object):
         game = Checkers()
         player = HeuristicOpponent(NetworkHeuristic(network), search_depth=self.search_depth)
         user = UserOpponent(auto = HeuristicOpponent(SimpleHeuristic(), search_depth=self.opponent_search_depth))
-        playgame(player, user, game=game, history=history)
+        playgame(player, user, game=game, history=history, verbose=True)
 
     def solve(self, network):
         o = self.opponent_handicap
@@ -279,9 +285,9 @@ class UserOpponent(object):
                 elif user_input == 'q':
                     return None
                 elif ' ' in user_input:
-                    move = tuple(int(i) for i in user_input.split(' '))
+                    move = tuple(int(NUMBERING_TO_INTERNAL[i]) for i in user_input.split(' '))
                 else:
-                    move = tuple(int(i) for i in user_input.split('-'))
+                    move = tuple(int(NUMBERING_TO_INTERNAL[i]) for i in user_input.split('-'))
                 if move is not None:
                     board.copy_and_play(move)
                 moved = True
@@ -325,7 +331,8 @@ class HeuristicOpponent(object):
             # self.heuristic.evaluate(board.copy_and_play(bestmove), verbose=True)
             print "%d evals. value: %.2f" % (evals[0], bestval)
         if historical and self.handicap == 0 and bestmove != historical:
-            raise Exception("Playing different move from history. Shouldn't happen because I'm deterministic!")
+            raise Exception("Playing different move (%s) from history (%s). Shouldn't happen because I'm deterministic!" %
+                (bestmove, historical))
         if secondbest is not None and self.handicap > 0 and random.random() < self.handicap:
             return secondbest
         return bestmove
@@ -341,6 +348,7 @@ class SimpleHeuristic(object):
         if verbose:
             print "EVALUTING: "
             print game
+
 
         if game.game_over():
             return 5000 * game.winner()
@@ -359,10 +367,10 @@ class SimpleHeuristic(object):
         endgame = 2;
         intactdoublecorner = 3;
 
-        nwm = counts[WHITE|MAN]
-        nwk = counts[WHITE|KING]
-        nbm = counts[BLACK|MAN]
-        nbk = counts[BLACK|KING]
+        nwm = counts[WHITE_MAN]
+        nwk = counts[WHITE_KING]
+        nbm = counts[BLACK_MAN]
+        nbk = counts[BLACK_KING]
 
         if verbose: print nwm, nwk, nbm, nbk
 
@@ -381,9 +389,9 @@ class SimpleHeuristic(object):
 
         val += turn if game.to_move == BLACK else -turn
 
-        if board[23] == (BLACK|MAN) and board[28] == (WHITE|MAN):
+        if board[23] == (BLACK_MAN) and board[28] == (WHITE_MAN):
             val += cramp
-        if board[22] == (WHITE|MAN) and board[17] == (BLACK|MAN):
+        if board[22] == (WHITE_MAN) and board[17] == (BLACK_MAN):
             val -= cramp
 
         # Back rank guard
@@ -437,9 +445,9 @@ class SimpleHeuristic(object):
         if verbose: print 'backrank', val
 
         # Double Corner
-        if board[8] == BLACK|MAN and (board[12] == BLACK|MAN or board[13] == BLACK|MAN):
+        if board[8] == BLACK_MAN and (board[12] == BLACK_MAN or board[13] == BLACK_MAN):
             val += intactdoublecorner
-        if board[37] == WHITE|MAN and (board[32] == WHITE|MAN or board[33] == WHITE|MAN):
+        if board[37] == WHITE_MAN and (board[32] == WHITE_MAN or board[33] == WHITE_MAN):
             val -= intactdoublecorner
 
         if verbose: print 'double corner', val
@@ -447,10 +455,10 @@ class SimpleHeuristic(object):
         # Center control
         bm = bk = wm = wk = 0
         for pos in CENTER:
-            if board[pos] == BLACK|MAN: bm += 1
-            elif board[pos] == BLACK|KING: bk += 1
-            elif board[pos] == WHITE|MAN: wm += 1
-            elif board[pos] == WHITE|KING: wk += 1
+            if board[pos] == BLACK_MAN: bm += 1
+            elif board[pos] == BLACK_KING: bk += 1
+            elif board[pos] == WHITE_MAN: wm += 1
+            elif board[pos] == WHITE_KING: wk += 1
 
         val += (bm - wm) * mcv
         val += (bk - wk) * kcv
@@ -460,10 +468,10 @@ class SimpleHeuristic(object):
         # Edge
         bm = bk = wm = wk = 0
         for pos in EDGE:
-            if board[pos] == BLACK|MAN: bm += 1
-            elif board[pos] == BLACK|KING: bk += 1
-            elif board[pos] == WHITE|MAN: wm += 1
-            elif board[pos] == WHITE|KING: wk += 1
+            if board[pos] == BLACK_MAN: bm += 1
+            elif board[pos] == BLACK_KING: bk += 1
+            elif board[pos] == WHITE_MAN: wm += 1
+            elif board[pos] == WHITE_KING: wk += 1
 
         val -= (bm - wm) * mev
         val -= (bk - wk) * kev
@@ -473,9 +481,9 @@ class SimpleHeuristic(object):
         # Tempo
         tempo = 0
         for i in range(5, 41):
-            if board[i] == BLACK|MAN:
+            if board[i] == BLACK_MAN:
                 tempo += ROW[i]
-            elif board[i] == WHITE|MAN:
+            elif board[i] == WHITE_MAN:
                 tempo -= 7-ROW[i]
         if nm >= 16:
             val += opening * tempo
@@ -486,11 +494,11 @@ class SimpleHeuristic(object):
 
         for pos in SAFEEDGE:
             if nbk + nbm > nwk + nwm and nwk < 3:
-                if board[pos] == (WHITE|KING):
+                if board[pos] == (WHITE_KING):
                     val -= 15
             
             if nwk + nwm > nbk + nbm and nbk < 3:
-                if board[pos] == (BLACK|KING):
+                if board[pos] == (BLACK_KING):
                     val += 15
 
         if verbose: print 'tempo', val
@@ -506,6 +514,7 @@ class SimpleHeuristic(object):
 
         # I have no idea what this last bit does XD.. it's correct tho.
         stonesinsystem = 0
+        ns = nm + nk
         if nwm + nwk - nbk - nbm == 0:
             if game.to_move == BLACK:
                 for i in xrange(5, 9):
@@ -513,30 +522,30 @@ class SimpleHeuristic(object):
                         if board[i + 9 * j] != FREE:
                             stonesinsystem += 1
                 if stonesinsystem % 2 == 0:
-                    if nm + nk <= 12: val += 1
-                    if nm + nk <= 10: val += 1
-                    if nm + nk <= 8: val += 2
-                    if nm + nk <= 6: val += 2
+                    if ns <= 12: val += 1
+                    if ns <= 10: val += 1
+                    if ns <= 8: val += 2
+                    if ns <= 6: val += 2
                 else:
-                    if nm + nk <= 12: val -= 1
-                    if nm + nk <= 10: val -= 1
-                    if nm + nk <= 8: val -= 2
-                    if nm + nk <= 6: val -= 2
+                    if ns <= 12: val -= 1
+                    if ns <= 10: val -= 1
+                    if ns <= 8: val -= 2
+                    if ns <= 6: val -= 2
             else:
                 for i in xrange(10, 14):
                     for j in xrange(4):
                         if board[i + 9 * j] != FREE:
                             stonesinsystem += 1
                 if stonesinsystem % 2 == 0:
-                    if nm + nk <= 12: val += 1
-                    if nm + nk <= 10: val += 1
-                    if nm + nk <= 8: val += 2
-                    if nm + nk <= 6: val += 2
+                    if ns <= 12: val += 1
+                    if ns <= 10: val += 1
+                    if ns <= 8: val += 2
+                    if ns <= 6: val += 2
                 else:
-                    if nm + nk <= 12: val -= 1
-                    if nm + nk <= 10: val -= 1
-                    if nm + nk <= 8: val -= 2
-                    if nm + nk <= 6: val -= 2
+                    if ns <= 12: val -= 1
+                    if ns <= 10: val -= 1
+                    if ns <= 8: val -= 2
+                    if ns <= 6: val -= 2
 
         if verbose: print "Value: %.3f" % val
         return val
@@ -568,11 +577,13 @@ class NetworkHeuristic(object):
         if game.game_over():
             return 5000 * game.winner()
         board = board2d(game.board)
-        net_inputs = ((board == BLACK | MAN) * 0.5 +
-                      (board == WHITE | MAN) * -0.5 +
-                      (board == BLACK | KING) * 0.75 +
-                      (board == WHITE | KING) * -0.75)
-        self.network.flush()
+        board.dtype = float
+        net_inputs = np.zeros(board.shape)
+        board[board == BLACK | MAN] = 0.5
+        board[board == WHITE | MAN] = -0.5
+        board[board == BLACK | KING] = 0.75
+        board[board == WHITE | KING] = -0.75
+
         # Feed twice to propagate through 3 layer network:
         value = self.network.feed(net_inputs, add_bias=False)
         return value[-1]
@@ -712,22 +723,18 @@ class Checkers(object):
         return self
 
     def undoplay(self, move):
-        raise NotImplementedError("Not done.")
+        raise NotImplemented
         if move != self.history[-1]:
             raise Exception("Trying to undo move that wasn't last.")
-        if self.fly_kings:
-            # Because a flight could be a capture and vice-versa.
-            raise Exception("Cannot undo move with flying kings.")
-
+        # Restore captured pieces
+        for i, capped in enumerate(self.history_captures.pop()):
+            # Captured piece location is average of move locations
+            self.board[move[i]+move[i+1] / 2] = capped
         # Undo the actual move:
-        positions = [INVNUM[p] for p in move]
-        (ly, lx) = positions[0]
-        for (py, px) in positions[1:]:
-            if abs(py - ly) > 1:
-                pass
-
+        piece = self.board[move[-1]]
+        self.board[move[-1]] = FREE
+        self.board[move[0]] = piece
         self.history.pop()
-        self.history_captures.pop()
         self.to_move = WHITE if self.to_move == BLACK else BLACK
         self.turn -= 1
         self._moves = None
