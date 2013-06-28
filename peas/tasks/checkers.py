@@ -577,15 +577,14 @@ class NetworkHeuristic(object):
         if game.game_over():
             return 5000 * game.winner()
         board = board2d(game.board)
-        board.dtype = float
-        net_inputs = np.zeros(board.shape)
-        board[board == BLACK | MAN] = 0.5
-        board[board == WHITE | MAN] = -0.5
-        board[board == BLACK | KING] = 0.75
-        board[board == WHITE | KING] = -0.75
+        net_input = np.zeros((8,8))
+        net_input[board == BLACK | MAN] = 0.5
+        net_input[board == WHITE | MAN] = -0.5
+        net_input[board == BLACK | KING] = 0.75
+        net_input[board == WHITE | KING] = -0.75
 
         # Feed twice to propagate through 3 layer network:
-        value = self.network.feed(net_inputs, add_bias=False)
+        value = self.network.feed(net_input, add_bias=False)
         return value[-1]
 
 class RandomOpponent(object):
