@@ -82,8 +82,6 @@ class WaveletGenotype(object):
         mat = np.hstack((mat, t))
         sigma = np.random.normal(loc=0.5, scale=0.3)
         weight = np.random.normal(loc=0, scale=self.stdev_mutate)
-        print weight
-        print self.stdev_mutate
         # This option adds a large 'uniform' blob wavelet to allow evolution
         # to set a zero weight level.
         if uniform:
