@@ -60,10 +60,10 @@ CENTER = [15, 16, 20, 21, 24, 25, 29, 30]
 # EDGE = [(0,0), (0,2), (0,4), (0,6), (1,7), (2,0), (3,7), (4,0), (5,7), (6,0), (7,1), (7,3), (7,5), (7,7)]
 EDGE = [5, 6, 7, 8, 13, 14, 22, 23, 31, 32, 37, 38, 39, 40]
 # SAFEEDGE = [(0,6), (1,7), (6,0), (7,1)]
-SAFEEDGE = [7, 13, 32, 37]
+SAFEEDGE = [8, 13, 32, 37]
 ROW = [0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,0,3,3,3,3,4,4,4,4,0,5,5,5,5,6,6,6,6,0,7,7,7,7]
 
-INV_NUMBERING =[tuple(a[0] for a in np.nonzero(NUMBERING == n)) for n in range(1, NUMBERING.max() + 1)]
+INV_NUMBERING =[tuple(a[0] for a in np.nonzero(NUMBERING == n)) for n in range(NUMBERING.max() + 1)]
 INV_INTERNAL = [(tuple(a[0] for a in np.nonzero(INTERNAL == n)) if n in INTERNAL else None) for n in range(INTERNAL.max() + 1)]
 INTERNAL_TO_NUMBERING = [NUMBERING[a] for a in INV_INTERNAL]
 NUMBERING_TO_INTERNAL = [INTERNAL[a] for a in INV_NUMBERING]
@@ -110,7 +110,7 @@ def alphabeta(node, heuristic, player_max=True, depth=4, alpha=-inf, beta=inf, k
             depth = 1
         else:
             num_evals[0] += 1
-            value = heuristic(node, False)
+            value = heuristic(node)
             # if value == 25: heuristic(node, True)
             # print "[%s] %.3f" % ("+" if player_max else "-", value),
             return value
@@ -166,6 +166,8 @@ def playgame(black, white, game=None, history=None, verbose=False):
     print "Checkers: %s vs. %s " % (black, white)
     while not game.game_over():
         i += 1
+        if verbose:
+            print game
         historical = history.pop(0) if history else None
         move = current.pickmove(game, historical=historical, verbose=verbose)
         if move != historical:
@@ -182,6 +184,7 @@ def playgame(black, white, game=None, history=None, verbose=False):
     fitness.extend([gamefitness(game)] * (100 - len(fitness)))
     fitness = fitness[-100:]
     winner = game.winner()
+    print "Winner: %s in %d turns." % (["WHITE", "DRAW", "BLACK"][int(winner)+1], i)
     return winner, fitness
 
 ### CLASSES ###
@@ -267,7 +270,6 @@ class UserOpponent(object):
         moved = False
         while not moved:
             # Prompt user for move
-            print board
             if board.history:
                 print "Opponent moved %s" % movestr(board.history[-1])
             print "Enter move ([h]istory: %s, [a]uto: %s):" % (movestr(historical), movestr(best)),
@@ -276,6 +278,7 @@ class UserOpponent(object):
                     user_input = raw_input()
                 else:
                     user_input = 'a'
+                    print 'a'
                 if user_input == 's':
                     self.skip = True
                 if user_input == 'h' or (historical is not None and user_input == ''):
@@ -285,14 +288,14 @@ class UserOpponent(object):
                 elif user_input == 'q':
                     return None
                 elif ' ' in user_input:
-                    move = tuple(int(NUMBERING_TO_INTERNAL[i]) for i in user_input.split(' '))
+                    move = tuple(NUMBERING_TO_INTERNAL[int(i)] for i in user_input.split(' '))
                 else:
-                    move = tuple(int(NUMBERING_TO_INTERNAL[i]) for i in user_input.split('-'))
+                    move = tuple(NUMBERING_TO_INTERNAL[int(i)] for i in user_input.split('-'))
                 if move is not None:
                     board.copy_and_play(move)
                 moved = True
             except (IllegalMoveError, ValueError):
-                print "Illegal move."
+                print "Illegal move %s > %s." % (user_input, move)
         return move
 
         
@@ -349,7 +352,6 @@ class SimpleHeuristic(object):
             print "EVALUTING: "
             print game
 
-
         if game.game_over():
             return 5000 * game.winner()
         board = game.board
@@ -377,10 +379,12 @@ class SimpleHeuristic(object):
         vb = (100 * nbm + 130 * nbk)
         vw = (100 * nwm + 130 * nwk)
         
-        val = 0
+        val = (vb - vw)
+
+        if verbose: print 'diff', val
         
         if (vb + vw) > 0:        
-            val = (vb - vw) + (250 * (vb-vw))/(vb+vw); #favor exchanges if in material plus
+            val += int(250 * (vb - vw) / float(vb + vw)) #favor exchanges if in material plus
 
         if verbose: print 'counts', val
 
@@ -492,6 +496,8 @@ class SimpleHeuristic(object):
         if nm < 9:
             val += endgame * tempo
 
+        if verbose: print 'tempo', val
+
         for pos in SAFEEDGE:
             if nbk + nbm > nwk + nwm and nwk < 3:
                 if board[pos] == (WHITE_KING):
@@ -501,8 +507,7 @@ class SimpleHeuristic(object):
                 if board[pos] == (BLACK_KING):
                     val += 15
 
-        if verbose: print 'tempo', val
-
+        if verbose: print 'safeedge', val
         # [[ 5  0  6  0  7  0  8  0]
         #  [ 0 10  0 11  0 12  0 13]
         #  [14  0 15  0 16  0 17  0]
@@ -521,7 +526,7 @@ class SimpleHeuristic(object):
                     for j in xrange(4):
                         if board[i + 9 * j] != FREE:
                             stonesinsystem += 1
-                if stonesinsystem % 2 == 0:
+                if stonesinsystem % 2:
                     if ns <= 12: val += 1
                     if ns <= 10: val += 1
                     if ns <= 8: val += 2
@@ -547,7 +552,7 @@ class SimpleHeuristic(object):
                     if ns <= 8: val -= 2
                     if ns <= 6: val -= 2
 
-        if verbose: print "Value: %.3f" % val
+        if verbose: print "Value" , val
         return val
 
 class PieceCounter(object):
@@ -596,7 +601,7 @@ class Checkers(object):
     """ Represents the checkers game(state)
     """
 
-    def __init__(self, no_advance_draw=50, max_repeat_moves=1000):
+    def __init__(self, no_advance_draw=49, max_repeat_moves=1000):
         """ Initialize the game board. """
         self.no_advance_draw = no_advance_draw
 
@@ -615,6 +620,26 @@ class Checkers(object):
         self.board[[0,9,18,27,36]] = EMPTY
         
         self._moves = None
+
+    @classmethod
+    def from_string(cls, string):
+        d = {'w': WHITE|MAN,
+             'b': BLACK|MAN,
+             'W': WHITE|KING,
+             'B': BLACK|KING,
+             '-': FREE,
+             ' ': EMPTY}
+        board = np.array([d[c] for c in string[2:]], dtype=int)
+
+        game = cls()
+        game.to_move = BLACK if string[0] == 'B' else WHITE
+        # game.history = None
+        game.turn = None
+        game.history_captures = None
+        game.advancement = None
+        game.board = board
+        return game
+
 
     def all_moves(self):
         if self._moves is None:
@@ -745,9 +770,10 @@ class Checkers(object):
     def check_draw(self, verbose=False):
         # If there were no captures in the last [50] moves, draw.
         i = 0
-        for i in xrange(len(self.advancement)):
-            if self.advancement[-(i+1)]:
-                break
+        if self.advancement:
+            for i in xrange(len(self.advancement)):
+                if self.advancement[-(i+1)]:
+                    break
         if verbose:
             print "Last capture: %d turns ago." % (i)
         return (i > self.no_advance_draw)
@@ -766,8 +792,8 @@ class Checkers(object):
         """ Returns board score. """
         arr = np.array(self.board)
         if self.check_draw():
-            wk = (arr & (WHITE|KING)).sum()
-            bk = (arr & (BLACK|KING)).sum()
+            wk = (arr == (WHITE|KING)).sum()
+            bk = (arr == (BLACK|KING)).sum()
             if wk >= 3 * bk:
                 return -1.0
             elif bk >= 3* wk:
@@ -792,21 +818,25 @@ class Checkers(object):
         s = np.array([l for l in "     wb  WB     -"])
         s = s[board]
         if self.to_move == BLACK:
-            s[0,7] = '^'
+            s[0,7] = '*'
         else:
-            s[7,0] = 'v'
+            s[7,0] = '*'
         n = [''.join(('%2d' % n) if (n > 0) else '  ' for n in row) for row in NUMBERING]
         s = [' '.join(l) for l in s]
         o = ['   %s   ||   %s' % line for line in zip(s, n)]
-        o = '\n'.join(o[::-1])
+        # if self.to_move == BLACK:
+        o.reverse()
+        o = '\n'.join(o)
         return o
     
 ### PROCEDURE ###
 
 if __name__ == '__main__':
     c = Checkers()
-    user = UserOpponent()
-    opponent = HeuristicOpponent(SimpleHeuristic(), search_depth=4)
-    playgame(opponent, user)
+    # black = HeuristicOpponent(SimpleHeuristic(), search_depth=4)
+    black = UserOpponent(auto=HeuristicOpponent(SimpleHeuristic(), search_depth=6))
+    # white = UserOpponent()
+    white = HeuristicOpponent(PieceCounter(), search_depth=6)
+    playgame(black, white, verbose=True)
     # opponent.play_against(user_side=BLACK)
     
