@@ -51,7 +51,8 @@ class WaveletGenotype(object):
                  prob_add=0.1,
                  prob_mutate_bias=0.0,
                  prob_modify=0.3,
-                 stdev_mutate=0.1,
+                 stdev_mutate=1.0,
+                 stdev_mutate_matrix=0.1,
                  add_initial_uniform=False,
                  initial=1):
         # Instance vars
@@ -60,6 +61,7 @@ class WaveletGenotype(object):
         self.prob_mutate_bias = prob_mutate_bias
         self.prob_modify  = prob_modify
         self.stdev_mutate = stdev_mutate
+        self.stdev_mutate_matrix = stdev_mutate_matrix
         self.wavelets     = [list() for _ in xrange(layers)] # Each defined by an affine matrix.
         self.bias = 0.0
         
@@ -98,9 +100,9 @@ class WaveletGenotype(object):
             for layer in self.wavelets:
                 for wavelet in layer:
                     if rand() < self.prob_modify:
-                        wavelet[0] += np.random.normal(0, self.stdev_mutate)
-                        wavelet[1] += np.random.normal(0, self.stdev_mutate)
-                        wavelet[2] += np.random.normal(0, self.stdev_mutate, wavelet[2].shape)
+                        wavelet[0] += np.random.normal(loc=0, scale=self.stdev_mutate)
+                        wavelet[1] += np.random.normal(loc=0, scale=self.stdev_mutate)
+                        wavelet[2] += np.random.normal(loc=0, scale=self.stdev_mutate_matrix, shape=wavelet[2].shape)
                 
         return self # for chaining
 
