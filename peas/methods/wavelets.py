@@ -102,7 +102,7 @@ class WaveletGenotype(object):
                     if rand() < self.prob_modify:
                         wavelet[0] += np.random.normal(loc=0, scale=self.stdev_mutate)
                         wavelet[1] += np.random.normal(loc=0, scale=self.stdev_mutate)
-                        wavelet[2] += np.random.normal(loc=0, scale=self.stdev_mutate_matrix, shape=wavelet[2].shape)
+                        wavelet[2] += np.random.normal(loc=0, scale=self.stdev_mutate_matrix, size=wavelet[2].shape)
                 
         return self # for chaining
 
