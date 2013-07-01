@@ -53,6 +53,7 @@ class WaveletGenotype(object):
                  prob_modify=0.3,
                  stdev_mutate=1.0,
                  stdev_mutate_matrix=0.1,
+                 initial_weight=0.3,
                  add_initial_uniform=False,
                  initial=1):
         # Instance vars
@@ -67,7 +68,7 @@ class WaveletGenotype(object):
         
         for _ in xrange(initial):
             for l in xrange(layers):
-                self.add_wavelet(l)
+                self.add_wavelet(layer=l)
                 if add_initial_uniform:
                     self.add_wavelet(l, uniform=True)
         
@@ -79,8 +80,10 @@ class WaveletGenotype(object):
         norms = np.sqrt(np.sum(mat ** 2, axis=1))[:, np.newaxis]
         mat /= norms
         mat = np.hstack((mat, t))
-        sigma = np.random.normal(0.5, 0.3)
-        weight = np.random.normal(0, 0.3)
+        sigma = np.random.normal(loc=0.5, scale=0.3)
+        weight = np.random.normal(loc=0, scale=self.stdev_mutate)
+        print weight
+        print self.stdev_mutate
         # This option adds a large 'uniform' blob wavelet to allow evolution
         # to set a zero weight level.
         if uniform:
@@ -160,7 +163,7 @@ class WaveletDeveloper(object):
         cm[np.abs(cm) < self.min_weight] = 0
         cm -= (np.sign(cm) * self.min_weight)
         cm *= self.weight_range / (self.weight_range - self.min_weight)
-        
+
 
         # Clip highest weights
         cm = np.clip(cm, -self.weight_range, self.weight_range)
