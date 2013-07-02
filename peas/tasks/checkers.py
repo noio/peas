@@ -247,10 +247,11 @@ class CheckersTask(object):
         output = NUMBERING.copy() * 0.0
         for y in range(8):
             for x in range(8):
-                inpt = NUMBERING.copy() * 0
-                inpt[y,x] = 1
-                value = network.feed(inpt, add_bias=False)[-1]
-                output[y,x] = value
+                if (x + y) % 2 == 0:
+                    inpt = NUMBERING.copy() * 0
+                    inpt[y,x] = 1
+                    value = network.feed(inpt, add_bias=False)[-1]
+                    output[y,x] = value
         plt.imshow(output, vmin=-1, vmax=1, interpolation='nearest', extent=[0,8,0,8], cmap='RdYlGn')
         plt.grid(zorder=2)
         plt.savefig(filename)

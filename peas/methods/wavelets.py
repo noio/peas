@@ -53,7 +53,6 @@ class WaveletGenotype(object):
                  prob_modify=0.3,
                  stdev_mutate=1.0,
                  stdev_mutate_matrix=0.1,
-                 initial_weight=0.3,
                  add_initial_uniform=False,
                  initial=1):
         # Instance vars
