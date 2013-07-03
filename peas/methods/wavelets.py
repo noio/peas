@@ -94,10 +94,10 @@ class WaveletGenotype(object):
         """ Mutate this individual """
         if rand() < self.prob_mutate_bias:
             self.bias += np.random.normal(0, self.stdev_mutate)
-        if rand() < self.prob_add:
-            self.add_wavelet()
         else:   
             for layer in self.wavelets:
+                if rand() < self.prob_add:
+                    self.add_wavelet(layer)
                 for wavelet in layer:
                     if rand() < self.prob_modify:
                         wavelet[0] += np.random.normal(loc=0, scale=self.stdev_mutate)
