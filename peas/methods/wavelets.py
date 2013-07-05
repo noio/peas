@@ -147,6 +147,9 @@ class WaveletDeveloper(object):
     
     def convert(self, individual):
         cm = np.zeros((self.substrate.num_nodes, self.substrate.num_nodes))
+
+        if not hasattr(individual, 'bias'):
+            individual.bias = 0.0
         
         for (i,j), coords, conn_id, expr_id in self.substrate.get_connection_list(self.add_deltas):
             # Add a bias (translation)

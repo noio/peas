@@ -244,16 +244,26 @@ class CheckersTask(object):
 
     def visualize(self, network, filename):
         import matplotlib.pyplot as plt
-        output = NUMBERING.copy() * 0.0
-        for y in range(8):
-            for x in range(8):
-                if (x + y) % 2 == 0:
-                    inpt = NUMBERING.copy() * 0
-                    inpt[y,x] = 1
-                    value = network.feed(inpt, add_bias=False)[-1]
-                    output[y,x] = value
-        plt.imshow(output, vmin=-1, vmax=1, interpolation='nearest', extent=[0,8,0,8], cmap='RdYlGn')
-        plt.grid(zorder=2)
+        single_value = np.zeros((8,8))
+        for y in xrange(8):
+            for x in xrange(8):
+                # if (x + y) % 2 == 1: continue
+                inpt = np.zeros((8,8))
+                inpt[y,x] = 1.0
+                value = network.feed(inpt, add_bias=False)[-1]
+                single_value[y,x] = value
+        top_layer = network.cm[-1,-65:-1].reshape((8,8))
+        plt.figure(1)
+        
+        ax = plt.subplot(121)
+        ax.imshow(single_value, interpolation='nearest', extent=[0,8,8,0], cmap='RdYlGn',)#  vmin=-1, vmax=1,)
+        ax.grid(zorder=2)
+        ax.set_ylabel(r'white $\Longrightarrow \quad \Longleftarrow$ black',fontsize=16)
+        
+        ax = plt.subplot(122)
+        ax.imshow(top_layer, interpolation='nearest', extent=[0,8,8,0], cmap='RdBu')
+        ax.grid(zorder=2)
+        
         plt.savefig(filename)
         print filename
         plt.close()

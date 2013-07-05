@@ -268,10 +268,10 @@ class LineFollowingTask(object):
         self.evaluate(network, draw=False, drawname=filename)
         print "Saving as " + os.path.join(os.getcwd(), filename)
         plt.figure()
-        plt.title(filename, fontsize=10)
-        plt.imshow(self.field_observation * 0.2, cmap='Greys', vmin=0, vmax=1)
+        # plt.title(filename, fontsize=10)
+        plt.imshow(self.field_observation * 0.5, cmap='Greys', vmin=0, vmax=1)
         for i in range(len(self.last_path)-1):
-            plt.plot(*zip(*self.last_path[i:i+2]), lw=7, alpha=0.3, color=(0.3,0,0.8))
+            plt.plot(*zip(*self.last_path[i:i+2]), lw=7, alpha=0.4, color=(0.5,0.2,1.0))
         plt.ylim(0,512)
         plt.xlim(0,512)
         plt.axis('off')
