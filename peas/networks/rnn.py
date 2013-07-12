@@ -336,6 +336,53 @@ class NeuralNetwork(object):
         else:
             prog = 'dot'
         G.draw(filename, prog=prog)
+
+    def visualize3d(self, filename, locs, include, selected='input-output'):
+        """ Visualize connectivity in 3D 
+            :param locations:  A list of 3D locations for each node.
+            :param include:    A binary array indicating which nodes to include connections FROM.
+            :param selected:   Include the selected nodes for their input or output.
+        """
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+
+        if not (locs.shape[0] == include.shape[0] == self.cm.shape[0]):
+            raise Exception("Dimensions don't match.")
+
+        lines = []
+        
+        if 'input' in selected:
+            for i in include.nonzero()[0]:
+                weights = self.cm[:,i]
+                from_loc = locs[i]
+                conns = weights.nonzero()
+                for w, to_loc in zip(weights[conns], locs[conns]):
+                    xs, ys, zs = zip(from_loc, to_loc)
+                    lines.append( (xs, ys, zs, w) )
+        if 'output' in selected:
+            for i in include.nonzero()[0]:
+                weights = self.cm[i,:]
+                to_loc = locs[i]
+                conns = weights.nonzero()
+                for w, from_loc in zip(weights[conns], locs[conns]):
+                    xs, ys, zs = zip(from_loc, to_loc)
+                    lines.append( (xs, ys, zs, w) )
+
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(*locs.T, color=(0.4,0.4,0.4))
+        for x, y, z, v in lines:
+            col = 'red' if v < 0 else 'blue'
+            width = np.sqrt(abs(v)) * 2
+            ax.plot(x,y,z, color=col, lw=width, alpha=0.5,)
+        ax.scatter(*locs[include].T, color=(0, 0, 0), s=40, zorder=200000)
+
+        # plt.axis('off')
+        plt.savefig(filename, bbox_inches='tight', pad_inches=0)
+        plt.close()
+
+
         
     def __str__(self):
         return 'Neuralnet with %d nodes.' % (self.act.shape[0])

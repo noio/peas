@@ -174,16 +174,17 @@ def playgame(black, white, game=None, history=None, verbose=False):
             history = None
         game.play(move)
         fitness.append(gamefitness(game))
-        sys.stdout.write('.')
+        sys.stdout.write('.' if i % 50 else '.\n')
         sys.stdout.flush()
         current, next = next, current
-
+    
     print
-    print game
     # Fitness over last 100 episodes
     fitness.extend([gamefitness(game)] * (100 - len(fitness)))
     fitness = fitness[-100:]
     winner = game.winner()
+    if verbose:
+        print game
     print "Winner: %s in %d turns." % (["WHITE", "DRAW", "BLACK"][int(winner)+1], i)
     return winner, fitness
 
@@ -340,16 +341,18 @@ class HeuristicOpponent(object):
                 bestval = val
                 secondbest = bestmove
                 bestmove = move
-        # Pick second best move
-        if verbose: 
-            # self.heuristic.evaluate(board.copy_and_play(bestmove), verbose=True)
-            print "%d evals. value: %.2f" % (evals[0], bestval)
         if historical and self.handicap == 0 and bestmove != historical:
             raise Exception("Playing different move (%s) from history (%s). Shouldn't happen because I'm deterministic!" %
                 (bestmove, historical))
+        # Pick second best move
         if secondbest is not None and self.handicap > 0 and random.random() < self.handicap:
-            return secondbest
-        return bestmove
+            move = secondbest
+            if verbose: print "Second best: ",
+        else:
+            move = bestmove
+        if verbose: 
+            print "%s. %d evals. value: %.2f" % (movestr(move), evals[0], bestval)
+        return move
 
     def __str__(self):
         return '%s with %s (lookahead: %d, handicap: %.2f)' % (self.__class__.__name__,
@@ -843,11 +846,15 @@ class Checkers(object):
 ### PROCEDURE ###
 
 if __name__ == '__main__':
-    c = Checkers()
-    # black = HeuristicOpponent(SimpleHeuristic(), search_depth=4)
-    black = UserOpponent(auto=HeuristicOpponent(SimpleHeuristic(), search_depth=6))
-    # white = UserOpponent()
-    white = HeuristicOpponent(PieceCounter(), search_depth=6)
-    playgame(black, white, verbose=True)
+    for h in [0.05, 0.10, 0.15, 0.20, 0.25]:
+        black = HeuristicOpponent(PieceCounter(), search_depth=4)
+        white = HeuristicOpponent(SimpleHeuristic(), search_depth=4, handicap=h)
+        score = {-1:0, 0:0, 1:0}
+        for _ in xrange(40):
+            winner, _ = playgame(black, white, verbose=False)
+            score[winner] += 1
+        print "h = %.2f" % h
+        print "Black %d, Draw %d, White: %d" % (score[1], score[0], score[-1])
+        print "============================"
     # opponent.play_against(user_side=BLACK)
     

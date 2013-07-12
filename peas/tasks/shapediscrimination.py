@@ -100,6 +100,29 @@ class ShapeDiscriminationTask(object):
             raise Exception("Shape Unknown.")  
         
         return im
+
+    def trial(self, pattern=None):
+        if pattern is None:
+            pattern = np.zeros((self.size, self.size))
+        else:
+            pattern *= 0.0
+        targetsize = self.target.shape[0]
+        distractor = random.choice(self.distractors)
+        distsize = distractor.shape[0]
+        x, y = np.random.randint(self.size - targetsize, size=2)
+    
+        pattern[x:x+targetsize, y:y+targetsize] = self.target
+        cx, cy = x + targetsize // 2, y + targetsize // 2
+    
+        for i in xrange(100):
+            x, y = np.random.randint(self.size - distsize, size=2)
+            if not np.any(pattern[x:x+distsize, y:y+distsize]):
+                pattern[x:x+distsize, y:y+distsize] = distractor
+                break
+            if i == 99:
+                raise Exception("No position found")
+
+        return pattern, cx, cy
         
     def evaluate(self, network):
         if not network.sandwich:
@@ -110,22 +133,7 @@ class ShapeDiscriminationTask(object):
         wsose = 0.0
         pattern = np.zeros((self.size, self.size))
         for _ in xrange(self.trials):
-            pattern *= 0.0
-            targetsize = self.target.shape[0]
-            distractor = random.choice(self.distractors)
-            distsize = distractor.shape[0]
-            x, y = np.random.randint(self.size - targetsize, size=2)
-        
-            pattern[x:x+targetsize, y:y+targetsize] = self.target
-            cx, cy = x + targetsize // 2, y + targetsize // 2
-        
-            for i in xrange(100):
-                x, y = np.random.randint(self.size - distsize, size=2)
-                if not np.any(pattern[x:x+distsize, y:y+distsize]):
-                    pattern[x:x+distsize, y:y+distsize] = distractor
-                    break
-                if i == 99:
-                    raise Exception("No position found")
+            pattern, cx, cy = self.trial(pattern)
 
             network.flush()
             output = network.feed(pattern, add_bias=False)
@@ -149,4 +157,47 @@ class ShapeDiscriminationTask(object):
         
     def solve(self, network):
         return self.evaluate(network)['dist'] < 0.5
+
+    def visualize(self, network, filename):
+        from scipy.misc import imsave, imresize
+        
+        s = self.size
+        sq = s * s
+        cm = network.cm[sq:,:sq]
+        cm = cm.reshape((s, s, s, s))
+        sp = s + 1
+        output = np.zeros((s*sp, s*sp))
+        for y in xrange(s):
+            for x in xrange(s):
+                output[y*sp:y*sp + s, x*sp:x*sp + s] = cm[y,x]
+
+        r = -1 * output * (output < 0)
+        g = np.zeros_like(output)
+        b = output * (output > 0)
+        rgb = np.concatenate((r[...,np.newaxis],g[...,np.newaxis],b[...,np.newaxis]),2)
+        
+        rgb = imresize(rgb, 4.0, interp='nearest')
+        imsave(filename, rgb)
+        # 3D net visualization:
+        pattern, cx, cy = self.trial()
+
+        locs = np.array(np.meshgrid(np.linspace(-1,1,self.size), np.linspace(-1,1,self.size), [1,0]))
+        locs = locs.transpose((3,2,1,0)).reshape((self.size*self.size*2, 3))
+        include = np.zeros((2, self.size,self.size), dtype=bool)
+        # include[0] = pattern > 0
+        include[1, 2, 3] = True
+        include[1, 9, 9] = True
+
+        network.visualize3d(filename[:-4] + '3d.png', locs, include.flatten())
+
+        # plt.show()
+
+
+        # plt.figure()
+        # plt.imshow(rgb, interpolation='nearest')
+        # plt.axis('off')
+        # plt.savefig(filename, bbox_inches='tight', pad_inches=0)
+
+        
+
     
