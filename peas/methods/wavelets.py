@@ -110,14 +110,15 @@ class WaveletGenotype(object):
         from matplotlib.mlab import PCA
         # Extract coords (translation part of matrix) of wavelets
         for layer in self.wavelets:
-            print "LAYER"
-            print id(layer)
+            # print "LAYER"
+            # print id(layer)
             for w in layer:
-                print w[0]
-                print w[1]
-                print w[2]
+                pass
+                # print w[0]
+                # print w[1]
+                # print w[2]
             t = np.array([w[2][:,-1] for w in layer])
-            print t
+            # print t
 
                         
     def __str__(self):

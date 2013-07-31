@@ -185,6 +185,8 @@ def playgame(black, white, game=None, history=None, verbose=False):
     winner = game.winner()
     if verbose:
         print game
+        print "Black avg. evals: %.2f" % np.mean(black.evals)
+        print "White avg. evals: %.2f" % np.mean(white.evals)
     print "Winner: %s in %d turns." % (["WHITE", "DRAW", "BLACK"][int(winner)+1], i)
     return winner, fitness
 
@@ -308,6 +310,7 @@ class UserOpponent(object):
                 moved = True
             except (IllegalMoveError, ValueError):
                 print "Illegal move %s > %s." % (user_input, move)
+        self.evals = self.auto.evals
         return move
 
         
@@ -320,6 +323,7 @@ class HeuristicOpponent(object):
         self.heuristic = heuristic
         self.handicap = handicap
         self.killer_moves = defaultdict(set)
+        self.evals = []
     
     def pickmove(self, board, verbose=False, historical=None):
         player_max = (board.to_move == BLACK)
@@ -352,6 +356,7 @@ class HeuristicOpponent(object):
             move = bestmove
         if verbose: 
             print "%s. %d evals. value: %.2f" % (movestr(move), evals[0], bestval)
+        self.evals.append(evals[0])
         return move
 
     def __str__(self):

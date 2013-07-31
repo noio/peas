@@ -115,7 +115,7 @@ class NEATGenotype(object):
             # The default method of creating a genotype
             # is to create a so called "fully connected"
             # genotype, i.e., connect all input nodes
-            # to the output node.
+            # to the output nodes.
             
             # Create input nodes
             for i in xrange(self.inputs):

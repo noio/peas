@@ -337,6 +337,23 @@ class NeuralNetwork(object):
             prog = 'dot'
         G.draw(filename, prog=prog)
 
+
+    def visualize2d(self, filename):
+        """ Visualize the connectivity matrix as 2D """
+        from scipy.misc import imsave, imresize
+        output = self.cm
+        output = output / max(output.max(), abs(output.min()))
+        r = -1.0 * output * (output < 0)
+        g = output ** 4 * 0.5
+        b = output * (output > 0)
+        r = r ** 0.5
+        b = b ** 0.5
+        rgb = np.concatenate((r[...,np.newaxis],g[...,np.newaxis],b[...,np.newaxis]),2)
+        rgb = np.clip(rgb * 0.8 + 0.2, 0, 1)
+        
+        rgb = imresize(rgb, 4.0, interp='nearest')
+        imsave(filename, rgb)
+
     def visualize3d(self, filename, locs, include, selected='input-output'):
         """ Visualize connectivity in 3D 
             :param locations:  A list of 3D locations for each node.
