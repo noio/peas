@@ -6,7 +6,7 @@ from functools import partial
 
 sys.path.append(os.path.join(os.path.split(__file__)[0],'..','..')) 
 from peas.methods.neat import NEATPopulation, NEATGenotype
-from peas.methods.neatpythonwrapper import NEATPythonPopulation
+# from peas.methods.neatpythonwrapper import NEATPythonPopulation
 from peas.tasks.polebalance import PoleBalanceTask
 
 # Create a factory for genotypes (i.e. a function that returns a new 
