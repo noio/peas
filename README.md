@@ -1,5 +1,3 @@
-**This library is under active development, if you have any questions or feature requests, don't hesitate to contact me. I know the documentation is lacking, so I can help out with that, and I'm also looking for feedback.**
-
 ![Logo](https://github.com/noio/peas/raw/master/peas.png)
 
 Python Evolutionary Algorithms
